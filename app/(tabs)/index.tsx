@@ -17,8 +17,6 @@ import { Product, CreateProductData, UpdateProductData } from '@/schemas/types';
 import ProductService from '@/services/ProductService';
 import ProductForm from '@/components/ProductForm';
 import AppLogo from '@/components/AppLogo';
-// Removed drag and drop; we will use simple up/down selectors
-
 export default function ProductManagementScreen() {
   const router = useRouter();
   const { empresaId } = useAuth();
@@ -27,12 +25,9 @@ export default function ProductManagementScreen() {
   const [formVisible, setFormVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const productService = ProductService.getInstance();
-
   useEffect(() => {
     initializeService();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   const initializeService = async () => {
     try {
       await productService.initialize();
@@ -40,107 +35,51 @@ export default function ProductManagementScreen() {
       console.error('Error initializing product service:', error);
     }
   };
-
-  // Using real-time data from Firestore only
-
   const handleRefreshProducts = async () => {
-    console.log('ProductManagementScreen.handleRefreshProducts: Manual refresh triggered');
     try {
       await refreshProducts();
-      console.log('ProductManagementScreen.handleRefreshProducts: Refresh completed', {
-        productsCount: products?.length
-      });
     } catch (error) {
       console.error('ProductManagementScreen.handleRefreshProducts: Refresh failed', error);
     }
   };
-
   const handleCreateProduct = () => {
     setEditingProduct(undefined);
     setFormVisible(true);
   };
-
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setFormVisible(true);
   };
-
   const handleSubmitProduct = async (productData: CreateProductData | UpdateProductData) => {
     const context = 'ProductManagementScreen.handleSubmitProduct';
-    console.log(`${context}: Starting product submission`, {
-      empresaId,
-      isEditing: !!editingProduct,
-      editingProductId: editingProduct?.id,
-      productData,
-      currentProductsCount: products.length
-    });
-
     if (!empresaId) {
       console.error(`${context}: No empresaId available`);
       Alert.alert('Error', 'No se pudo identificar la empresa');
       return;
     }
-
     setIsLoading(true);
     try {
       if (editingProduct) {
-        console.log(`${context}: Updating existing product`, {
-          productId: editingProduct.id,
-          empresaId
-        });
-        // Update existing product
         const result = await productService.updateProduct(
           empresaId,
           editingProduct.id,
           productData as UpdateProductData
         );
-
-        console.log(`${context}: Update result`, {
-          success: result.success,
-          errors: result.errors,
-          productId: editingProduct.id
-        });
-
         if (result.success) {
           Alert.alert('Éxito', 'Producto actualizado correctamente');
-          // Real-time listener will update the products automatically
         } else {
           console.error(`${context}: Update failed`, { errors: result.errors });
           Alert.alert('Error', result.errors?.join('\n') || 'Error al actualizar producto');
         }
       } else {
-        console.log(`${context}: Creating new product`);
-        // Create new product
         const posicion = products?.length || 0;
         const newProductData: CreateProductData = {
           ...(productData as Omit<CreateProductData, 'posicion'>),
           posicion, // Ensure posicion is always a valid number
         };
-
-        console.log(`${context}: Calling productService.createProduct`, {
-          empresaId,
-          newProductData,
-          posicionValue: posicion,
-          posicionType: typeof posicion,
-          productsLength: products?.length,
-          productsType: typeof products
-        });
-
         const result = await productService.createProduct(empresaId, newProductData);
-
-        console.log(`${context}: Creation result`, {
-          success: result.success,
-          data: result.data,
-          errors: result.errors
-        });
-
         if (result.success) {
-          console.log(`${context}: Product created successfully`, {
-            productId: result.data,
-            empresaId
-          });
           Alert.alert('Éxito', 'Producto creado correctamente');
-          // Real-time listener will update the products automatically
         } else {
           console.error(`${context}: Creation failed`, { errors: result.errors });
           Alert.alert('Error', result.errors?.join('\n') || 'Error al crear producto');
@@ -161,15 +100,11 @@ export default function ProductManagementScreen() {
       setIsLoading(false);
     }
   };
-
   const handleDeleteProduct = async (product: Product) => {
     if (!empresaId) return;
-
     setIsLoading(true);
     try {
-      // Check for dependencies
       const dependencies = await productService.checkProductDependencies(empresaId, product.id);
-
       if (dependencies.hasTransactions) {
         Alert.alert(
           'No se puede eliminar',
@@ -177,12 +112,9 @@ export default function ProductManagementScreen() {
         );
         return;
       }
-
       const result = await productService.deleteProduct(empresaId, product.id);
-
       if (result.success) {
         Alert.alert('Éxito', 'Producto eliminado correctamente');
-        // Real-time listener will update the products automatically
       } else {
         Alert.alert('Error', result.errors?.join('\n') || 'Error al eliminar producto');
       }
@@ -193,14 +125,11 @@ export default function ProductManagementScreen() {
       setIsLoading(false);
     }
   };
-
   const handleMoveProduct = async (fromIndex: number, toIndex: number) => {
     if (!empresaId || !products) return;
-
     const sorted = [...products].sort((a, b) => (a.posicion || 0) - (b.posicion || 0));
     if (fromIndex < 0 || fromIndex >= sorted.length || toIndex < 0 || toIndex >= sorted.length) return;
     if (fromIndex === toIndex) return;
-
     const product = sorted[fromIndex];
     setIsLoading(true);
     try {
@@ -208,7 +137,6 @@ export default function ProductManagementScreen() {
       if (!result.success) {
         Alert.alert('Error', result.errors?.join('\n') || 'No se pudo mover el producto');
       }
-      // Real-time listener actualizará la lista
     } catch (error) {
       console.error('ProductManagementScreen.handleMoveProduct: Exception', error);
       Alert.alert('Error', 'No se pudo mover el producto');
@@ -216,8 +144,6 @@ export default function ProductManagementScreen() {
       setIsLoading(false);
     }
   };
-
-  // Empty state component
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="cube-outline" size={64} color="#ccc" />
@@ -233,16 +159,14 @@ export default function ProductManagementScreen() {
       </TouchableOpacity>
     </View>
   );
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with Logo and Title (replaces search) */}
+      {}
       <View style={styles.logoHeader}>
         <AppLogo size="small" showText={false} />
         <Text style={[styles.title]}>Gestión de Productos</Text>
       </View>
-
-      {/* Header with Action Buttons */}
+      {}
       <View style={styles.headerContainer}>
         <TouchableOpacity
           style={styles.addButton}
@@ -252,8 +176,7 @@ export default function ProductManagementScreen() {
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.addButtonText}>Nuevo Producto</Text>
         </TouchableOpacity>
-
-        {/* Refresh button */}
+        {}
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={handleRefreshProducts}
@@ -261,12 +184,10 @@ export default function ProductManagementScreen() {
         >
           <Ionicons name="refresh" size={18} color="#25B4BD" />
         </TouchableOpacity>
-
-        {/* Company management button */}
+        {}
         <TouchableOpacity
           style={styles.companyButton}
           onPress={() => {
-            console.log('Navigating to company management');
             router.push('/(company)');
           }}
           disabled={isLoading}
@@ -275,8 +196,7 @@ export default function ProductManagementScreen() {
           <Text style={styles.companyButtonText}>Empresas</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Product List */}
+      {}
       {productsLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#25B4BD" />
@@ -324,7 +244,6 @@ export default function ProductManagementScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-
       <ProductForm
         visible={formVisible}
         onClose={() => setFormVisible(false)}
@@ -335,8 +254,6 @@ export default function ProductManagementScreen() {
     </SafeAreaView>
   );
 }
-
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

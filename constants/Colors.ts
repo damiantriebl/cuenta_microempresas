@@ -1,58 +1,40 @@
-/**
- * Color palette and theme system for the debt management app.
- * Based on the design specifications with gradient backgrounds and consistent color scheme.
- */
-
-// Primary gradient colors - Based on the app logo
 export const GradientColors = {
-  primary: ['#20B2AA', '#2E8B57'], // Main gradient from turquoise to green (logo colors)
-  secondary: ['#20B2AA', '#228B22'], // Accent gradient variation
-  card: ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)'], // Subtle card gradients
-  overlay: ['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.05)'], // Overlay gradients
+  primary: ['#20B2AA', '#2E8B57'], 
+  secondary: ['#20B2AA', '#228B22'], 
+  card: ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.7)'], 
+  overlay: ['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.05)'], 
 };
 
-// Core color palette - Based on the app logo
+
 export const AppColors = {
-  // Primary colors from logo
-  primaryAccent: '#20B2AA', // Turquoise from logo
-  primaryGreen: '#2E8B57', // Green from logo
+  
+  primaryAccent: '#20B2AA', 
+  primaryGreen: '#2E8B57', 
   gradientStart: '#20B2AA',
   gradientEnd: '#2E8B57',
-  
-  // UI colors
   buttonPrimary: '#3c3c3b',
-  backgroundLight: '#ebebeb', // rgb(235, 235, 235)
-  successGreen: '#2E8B57', // Use logo green for success
-  
-  // Text colors
+  backgroundLight: '#ebebeb', 
+  successGreen: '#2E8B57', 
   textPrimary: '#333333',
   textSecondary: '#666666',
   textLight: '#999999',
   textWhite: '#ffffff',
-  
-  // Status colors
-  success: '#2E8B57', // Logo green for success
+  success: '#2E8B57', 
   warning: '#f39c12',
   error: '#e74c3c', 
-  info: '#20B2AA', // Logo turquoise for info
-  
-  // Card and surface colors
+  info: '#20B2AA', 
   cardBackground: '#ffffff',
   cardShadow: 'rgba(0,0,0,0.1)',
   surfaceLight: '#f8f9fa',
   surfaceDark: '#e9ecef',
-  
-  // Border colors
   borderLight: '#e0e0e0',
   borderMedium: '#cccccc',
   borderDark: '#999999',
-  
-  // Transparent overlays
   overlay: 'rgba(0,0,0,0.5)',
   overlayLight: 'rgba(0,0,0,0.2)',
 };
 
-// Legacy Colors object for compatibility
+
 const tintColorLight = AppColors.primaryAccent;
 const tintColorDark = '#fff';
 
@@ -75,7 +57,7 @@ export const Colors = {
   },
 };
 
-// Spacing system for consistent layout
+
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -85,7 +67,7 @@ export const Spacing = {
   xxl: 48,
 };
 
-// Typography scale
+
 export const Typography = {
   fontSize: {
     xs: 12,
@@ -110,7 +92,7 @@ export const Typography = {
   },
 };
 
-// Shadow presets
+
 export const Shadows = {
   small: {
     shadowColor: AppColors.cardShadow,

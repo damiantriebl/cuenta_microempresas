@@ -15,10 +15,7 @@ import { Product, CreateProductData, UpdateProductData } from '@/schemas/types';
 import { validateProduct } from '@/schemas/validation';
 import { useToast } from '@/context/ToastProvider';
 import LoadingOverlay from '@/components/ui/LoadingOverlay';
-
-// Color picker imports
 import AppColorPicker from '@/components/ColorPicker';
-
 interface ProductFormProps {
   visible: boolean;
   onClose: () => void;
@@ -26,12 +23,10 @@ interface ProductFormProps {
   product?: Product; // If provided, we're editing
   isLoading?: boolean;
 }
-
 const DEFAULT_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
   '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
 ];
-
 export default function ProductForm({
   visible,
   onClose,
@@ -49,11 +44,8 @@ export default function ProductForm({
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [canCancel, setCanCancel] = useState(true);
-
   const { showToast } = useToast();
-
   const isEditing = !!product;
-
   useEffect(() => {
     if (product) {
       setNombre(product.nombre);
@@ -61,19 +53,15 @@ export default function ProductForm({
       setUltimoCosto(product.ultimoCosto?.toString() || '');
       setUltimaGanancia(product.ultimaGanancia?.toString() || '');
     } else {
-      // Reset form for new product
       setNombre('');
       setColorFondo('#808080');
       setUltimoCosto('');
       setUltimaGanancia('');
     }
-    // Reset all validation states
     setErrors([]);
     setFieldErrors({});
     setTouched({});
   }, [product, visible]);
-
-  // Real-time validation for individual fields
   const validateField = useCallback((fieldName: string, value: any): string => {
     switch (fieldName) {
       case 'nombre':
@@ -87,13 +75,11 @@ export default function ProductForm({
           return 'El nombre debe tener al menos 2 caracteres';
         }
         return '';
-
       case 'colorFondo':
         if (!value || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)) {
           return 'Selecciona un color válido';
         }
         return '';
-
       case 'ultimoCosto':
         if (!value || !value.trim()) {
           return 'El costo unitario es requerido';
@@ -109,7 +95,6 @@ export default function ProductForm({
           return 'El costo no puede exceder $999,999';
         }
         return '';
-
       case 'ultimaGanancia':
         if (!value || !value.trim()) {
           return 'La ganancia unitaria es requerida';
@@ -125,13 +110,10 @@ export default function ProductForm({
           return 'La ganancia no puede exceder $999,999';
         }
         return '';
-
       default:
         return '';
     }
   }, []);
-
-  // Validate entire form using schema validation
   const validateForm = useCallback((): boolean => {
     const productData: CreateProductData = {
       nombre: nombre.trim(),
@@ -141,38 +123,26 @@ export default function ProductForm({
       activo: true,
       posicion: product?.posicion || 0,
     };
-
     const validation = validateProduct(productData);
-
-    // Also validate individual fields for field-specific errors
     const newFieldErrors: { [key: string]: string } = {};
     newFieldErrors.nombre = validateField('nombre', nombre);
     newFieldErrors.colorFondo = validateField('colorFondo', colorFondo);
     newFieldErrors.ultimoCosto = validateField('ultimoCosto', ultimoCosto);
     newFieldErrors.ultimaGanancia = validateField('ultimaGanancia', ultimaGanancia);
-
     setFieldErrors(newFieldErrors);
     setErrors(validation.errors);
-
     const hasFieldErrors = Object.values(newFieldErrors).some(error => error !== '');
     return validation.isValid && !hasFieldErrors;
   }, [nombre, colorFondo, ultimoCosto, ultimaGanancia, product?.posicion, validateField]);
-
-  // Real-time field validation on blur
   const handleFieldBlur = useCallback((fieldName: string, value: any) => {
     setTouched(prev => ({ ...prev, [fieldName]: true }));
     const error = validateField(fieldName, value);
     setFieldErrors(prev => ({ ...prev, [fieldName]: error }));
   }, [validateField]);
-
-  // Real-time validation on change (debounced)
   const handleFieldChange = useCallback((fieldName: string, value: any) => {
-    // Clear error when user starts typing
     if (fieldErrors[fieldName]) {
       setFieldErrors(prev => ({ ...prev, [fieldName]: '' }));
     }
-
-    // Set the value
     switch (fieldName) {
       case 'nombre':
         setNombre(value);
@@ -188,23 +158,9 @@ export default function ProductForm({
         break;
     }
   }, [fieldErrors]);
-
   const handleSubmit = async () => {
     const context = 'ProductForm.handleSubmit';
-    console.log(`${context}: Starting form submission`, {
-      isEditing,
-      productId: product?.id,
-      formData: {
-        nombre: nombre.trim(),
-        colorFondo,
-        ultimoCosto: Number(ultimoCosto) || 0,
-        ultimaGanancia: Number(ultimaGanancia) || 0,
-        activo: true,
-        posicion: product?.posicion || 0
-      }
-    });
 
-    // Mark all fields as touched to show validation errors
     setTouched({
       nombre: true,
       colorFondo: true,
@@ -212,7 +168,6 @@ export default function ProductForm({
       ultimaGanancia: true,
     });
 
-    console.log(`${context}: Validating form`);
     if (!validateForm()) {
       console.error(`${context}: Form validation failed`, {
         fieldErrors,
@@ -224,20 +179,15 @@ export default function ProductForm({
           ultimaGanancia
         }
       });
-
-      // Show validation errors via toast
       showToast(
         'Por favor corrige los errores en el formulario antes de continuar.',
         'error'
       );
       return;
     }
-    console.log(`${context}: Form validation passed`);
 
-    // Set loading state
     setIsSubmitting(true);
     setCanCancel(false);
-
     try {
       const productData: CreateProductData | UpdateProductData = {
         nombre: nombre.trim(),
@@ -248,16 +198,12 @@ export default function ProductForm({
         ...(product && { posicion: product.posicion }), // Only include posicion when editing
       };
 
-      console.log(`${context}: Calling onSubmit with product data`, { productData });
       await onSubmit(productData);
-      console.log(`${context}: onSubmit completed successfully`);
 
-      // Show success message
       showToast(
         isEditing ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente',
         'success'
       );
-
       onClose();
     } catch (error) {
       console.error(`${context}: Form submission failed`, {
@@ -273,11 +219,8 @@ export default function ProductForm({
           ultimaGanancia: ultimaGanancia ? Number(ultimaGanancia) : undefined
         }
       });
-
-      // Enhanced error handling with more specific messages
       let errorMessage = 'No se pudo guardar el producto';
       let showRetry = true;
-
       if (error instanceof Error) {
         if (error.message.includes('network')) {
           errorMessage = 'Error de conexión. Verifica tu internet e intenta nuevamente.';
@@ -294,8 +237,6 @@ export default function ProductForm({
           errorMessage = 'Sin conexión a internet. Verifica tu conexión e intenta nuevamente.';
         }
       }
-
-      // Show error toast with retry action if applicable
       showToast(
         errorMessage,
         'error',
@@ -309,13 +250,10 @@ export default function ProductForm({
       setCanCancel(true);
     }
   };
-
   const handleColorSelect = (color: string) => {
     handleFieldChange('colorFondo', color);
     setColorPickerVisible(false);
   };
-
-  // Helper function to get input style based on validation state
   const getInputStyle = (fieldName: string) => {
     const hasError = touched[fieldName] && fieldErrors[fieldName];
     return [
@@ -324,8 +262,6 @@ export default function ProductForm({
       touched[fieldName] && !fieldErrors[fieldName] ? styles.inputValid : null
     ];
   };
-
-  // Helper function to show field error
   const renderFieldError = (fieldName: string) => {
     if (touched[fieldName] && fieldErrors[fieldName]) {
       return (
@@ -337,13 +273,9 @@ export default function ProductForm({
     }
     return null;
   };
-
-  // Calculate if form is valid for submit button state
   const isFormValid = !Object.values(fieldErrors).some(error => error !== '') &&
     nombre.trim() !== '' &&
     colorFondo !== '';
-
-  // Handle form cancellation
   const handleCancel = () => {
     if (isSubmitting && !canCancel) {
       showToast('No se puede cancelar mientras se guarda el producto', 'warning');
@@ -351,19 +283,14 @@ export default function ProductForm({
     }
     onClose();
   };
-
-  // Calculate total price with validation
   const getTotalPrice = () => {
     const costo = ultimoCosto ? Number(ultimoCosto) : 0;
     const ganancia = ultimaGanancia ? Number(ultimaGanancia) : 0;
-
     if (isNaN(costo) || isNaN(ganancia)) {
       return null;
     }
-
     return costo + ganancia;
   };
-
   return (
     <Modal
       visible={visible}
@@ -381,7 +308,6 @@ export default function ProductForm({
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
-
           {errors.length > 0 && (
             <View style={styles.errorContainer}>
               <View style={styles.errorHeader}>
@@ -393,7 +319,6 @@ export default function ProductForm({
               ))}
             </View>
           )}
-
           <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>
@@ -415,7 +340,6 @@ export default function ProductForm({
               <Text style={styles.characterCount}>{nombre.length}/50</Text>
               {renderFieldError('nombre')}
             </View>
-
             <View style={styles.inputGroup}>
               <Text style={styles.label}>
                 Color de Fondo *
@@ -434,7 +358,6 @@ export default function ProductForm({
                 >
                   <Ionicons name="color-palette" size={24} color="#fff" />
                 </TouchableOpacity>
-
                 <View style={styles.colorGrid}>
                   {DEFAULT_COLORS.map((color) => (
                     <TouchableOpacity
@@ -451,7 +374,6 @@ export default function ProductForm({
               </View>
               {renderFieldError('colorFondo')}
             </View>
-
             <View style={styles.priceRow}>
               <View style={[styles.inputGroup, styles.halfWidth]}>
                 <Text style={styles.label}>
@@ -471,7 +393,6 @@ export default function ProductForm({
                 />
                 {renderFieldError('ultimoCosto')}
               </View>
-
               <View style={[styles.inputGroup, styles.halfWidth]}>
                 <Text style={styles.label}>
                   Ganancia Unitaria *
@@ -491,7 +412,6 @@ export default function ProductForm({
                 {renderFieldError('ultimaGanancia')}
               </View>
             </View>
-
             {(() => {
               const totalPrice = getTotalPrice();
               if (totalPrice !== null && totalPrice > 0) {
@@ -507,7 +427,6 @@ export default function ProductForm({
               return null;
             })()}
           </ScrollView>
-
           <View style={styles.actions}>
             <TouchableOpacity
               style={[
@@ -525,7 +444,6 @@ export default function ProductForm({
                 Cancelar
               </Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={[
                 styles.button,
@@ -543,8 +461,7 @@ export default function ProductForm({
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Color Picker Modal */}
+          { }
           <Modal
             visible={colorPickerVisible}
             transparent
@@ -554,8 +471,7 @@ export default function ProductForm({
             <View style={styles.colorPickerOverlay}>
               <View style={styles.colorPickerContainer}>
                 <AppColorPicker
-                  color={colorFondo}
-                  onColorChangeComplete={handleColorSelect}
+                  onColorChange={handleColorSelect}
                 />
                 <TouchableOpacity
                   style={styles.colorPickerClose}
@@ -566,8 +482,7 @@ export default function ProductForm({
               </View>
             </View>
           </Modal>
-
-          {/* Loading Overlay */}
+          { }
           <LoadingOverlay
             visible={isSubmitting}
             message={isEditing ? 'Actualizando producto...' : 'Creando producto...'}
@@ -579,7 +494,6 @@ export default function ProductForm({
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,

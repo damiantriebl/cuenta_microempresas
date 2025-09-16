@@ -1,692 +1,1 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Timestamp } from 'firebase/firestore';
-import DatePickerModule from '@/components/DatePicker';
-import ProductSelector from '@/components/ProductSelector';
-import {
-  Product,
-  CreateSaleEventData,
-  CreatePaymentEventData,
-  CreateProductData
-} from '@/schemas/types';
-import {
-  createSaleEventData,
-  createPaymentEventData,
-  calculateSaleTotal
-} from '@/schemas/event-utils';
-import {
-  validateSaleEvent,
-  validatePaymentEvent
-} from '@/schemas/validation';
-
-interface TransactionModalProps {
-  visible: boolean;
-  onClose: () => void;
-  clienteId: string;
-  clienteName: string;
-  onCreateSale: (saleData: CreateSaleEventData) => Promise<void>;
-  onCreatePayment: (paymentData: CreatePaymentEventData) => Promise<void>;
-  onCreateProduct?: (productData: CreateProductData) => Promise<Product | null>;
-  isLoading?: boolean;
-}
-
-type TabType = 'sale' | 'payment';
-
-export default function TransactionModal({
-  visible,
-  onClose,
-  clienteId,
-  clienteName,
-  onCreateSale,
-  onCreatePayment,
-  onCreateProduct,
-  isLoading = false
-}: TransactionModalProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('sale');
-  const [showProductSelector, setShowProductSelector] = useState(false);
-
-  // Sale form state
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [cantidad, setCantidad] = useState('1');
-  const [costoUnitario, setCostoUnitario] = useState('');
-  const [gananciaUnitaria, setGananciaUnitaria] = useState('');
-  const [saleDate, setSaleDate] = useState(new Date());
-  const [saleNotas, setSaleNotas] = useState('');
-
-  // Payment form state
-  const [montoPago, setMontoPago] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date());
-  const [paymentNotas, setPaymentNotas] = useState('');
-
-  // UI state
-  const [errors, setErrors] = useState<string[]>([]);
-
-  // Reset form when modal opens/closes
-  useEffect(() => {
-    if (visible) {
-      resetForm();
-    }
-  }, [visible]);
-
-  const resetForm = () => {
-    setActiveTab('sale');
-    setSelectedProduct(null);
-    setCantidad('1');
-    setCostoUnitario('');
-    setGananciaUnitaria('');
-    setSaleDate(new Date());
-    setSaleNotas('');
-    setMontoPago('');
-    setPaymentDate(new Date());
-    setPaymentNotas('');
-    setErrors([]);
-  };
-
-  const handleProductSelect = (product: Product, cachedPrices: { ultimoCosto?: number; ultimaGanancia?: number }) => {
-    setSelectedProduct(product);
-
-    // Auto-fill with cached prices if available
-    if (cachedPrices.ultimoCosto !== undefined) {
-      setCostoUnitario(cachedPrices.ultimoCosto.toString());
-    }
-    if (cachedPrices.ultimaGanancia !== undefined) {
-      setGananciaUnitaria(cachedPrices.ultimaGanancia.toString());
-    }
-
-    setShowProductSelector(false);
-  };
-
-  const calculateTotal = (): number => {
-    const qty = Number(cantidad) || 0;
-    const costo = Number(costoUnitario) || 0;
-    const ganancia = Number(gananciaUnitaria) || 0;
-    return calculateSaleTotal(qty, costo, ganancia);
-  };
-
-  const validateSaleForm = (): boolean => {
-    const newErrors: string[] = [];
-
-    if (!selectedProduct) {
-      newErrors.push('Selecciona un producto');
-    }
-
-    if (!cantidad || Number(cantidad) <= 0) {
-      newErrors.push('La cantidad debe ser mayor a 0');
-    }
-
-    if (!costoUnitario || Number(costoUnitario) < 0) {
-      newErrors.push('El costo unitario debe ser mayor o igual a 0');
-    }
-
-    if (!gananciaUnitaria || Number(gananciaUnitaria) < 0) {
-      newErrors.push('La ganancia unitaria debe ser mayor o igual a 0');
-    }
-
-    if (saleNotas && saleNotas.length > 500) {
-      newErrors.push('Las notas no pueden exceder 500 caracteres');
-    }
-
-    setErrors(newErrors);
-    return newErrors.length === 0;
-  };
-
-  const validatePaymentForm = (): boolean => {
-    const newErrors: string[] = [];
-
-    const parsedMonto = parseLocaleNumber(montoPago);
-    if (!montoPago || isNaN(parsedMonto) || parsedMonto <= 0) {
-      newErrors.push('El monto del pago debe ser mayor a 0');
-    }
-
-    if (paymentNotas && paymentNotas.length > 500) {
-      newErrors.push('Las notas no pueden exceder 500 caracteres');
-    }
-
-    setErrors(newErrors);
-    return newErrors.length === 0;
-  };
-
-  const handleSaleSubmit = async () => {
-    if (!validateSaleForm() || !selectedProduct) {
-      return;
-    }
-
-    try {
-      const saleData = createSaleEventData({
-        clienteId,
-        producto: selectedProduct.nombre,
-        cantidad: Number(cantidad),
-        costoUnitario: Number(costoUnitario),
-        gananciaUnitaria: Number(gananciaUnitaria),
-        fecha: Timestamp.fromDate(saleDate),
-        productoColor: selectedProduct.colorFondo,
-        notas: saleNotas.trim() || undefined
-      });
-
-      // Validate the created data
-      const validation = validateSaleEvent(saleData);
-      if (!validation.isValid) {
-        setErrors(validation.errors);
-        return;
-      }
-
-      await onCreateSale(saleData);
-      onClose();
-    } catch (error) {
-      console.error('Error creating sale:', error);
-      Alert.alert('Error', 'No se pudo crear la venta');
-    }
-  };
-
-  const handlePaymentSubmit = async () => {
-    if (!validatePaymentForm()) {
-      return;
-    }
-
-    try {
-      const parsedMonto = parseLocaleNumber(montoPago);
-      const paymentData = createPaymentEventData({
-        clienteId,
-        montoPago: parsedMonto,
-        fecha: Timestamp.fromDate(paymentDate),
-        notas: paymentNotas.trim() || undefined
-      });
-
-      // Validate the created data
-      const validation = validatePaymentEvent(paymentData);
-      if (!validation.isValid) {
-        setErrors(validation.errors);
-        return;
-      }
-
-      await onCreatePayment(paymentData);
-      onClose();
-    } catch (error) {
-      console.error('Error creating payment:', error);
-      Alert.alert('Error', 'No se pudo crear el pago');
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-  const parseLocaleNumber = (value: string): number => {
-    if (!value) return NaN;
-    // Remove spaces
-    let sanitized = value.replace(/\s+/g, '');
-    // If it contains both comma and dot, assume dot is thousands and comma is decimal
-    if (sanitized.includes(',') && sanitized.includes('.')) {
-      sanitized = sanitized.replace(/\./g, '').replace(',', '.');
-    } else if (sanitized.includes(',')) {
-      // If only comma, treat it as decimal separator
-      sanitized = sanitized.replace(',', '.');
-    }
-    // Remove any non-number/decimal char
-    sanitized = sanitized.replace(/[^0-9.\-]/g, '');
-    return Number(sanitized);
-  };
-
-  const renderTabButton = (tab: TabType, label: string) => (
-    <TouchableOpacity
-      style={[
-        styles.tabButton,
-        activeTab === tab && styles.activeTabButton
-      ]}
-      onPress={() => setActiveTab(tab)}
-    >
-      <Text style={[
-        styles.tabButtonText,
-        activeTab === tab && styles.activeTabButtonText
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const renderSaleForm = () => (
-    <ScrollView
-      style={styles.formContainer}
-      contentContainerStyle={styles.formContentSpacer}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Product Selection */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Producto *</Text>
-        <TouchableOpacity
-          style={[
-            styles.productSelector,
-            selectedProduct && { backgroundColor: selectedProduct.colorFondo }
-          ]}
-          onPress={() => setShowProductSelector(true)}
-        >
-          {selectedProduct ? (
-            <Text style={styles.selectedProductText}>{selectedProduct.nombre}</Text>
-          ) : (
-            <Text style={styles.placeholderText}>Seleccionar producto</Text>
-          )}
-          <Ionicons name="chevron-down" size={20} color={selectedProduct ? "#fff" : "#666"} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Quantity */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Cantidad *</Text>
-        <TextInput
-          style={styles.input}
-          value={cantidad}
-          onChangeText={setCantidad}
-          placeholder="1"
-          keyboardType="numeric"
-        />
-      </View>
-
-      {/* Price Fields */}
-      <View style={styles.priceRow}>
-        <View style={[styles.fieldContainer, styles.halfWidth]}>
-          <Text style={styles.label}>Costo Unitario *</Text>
-          <TextInput
-            style={styles.input}
-            value={costoUnitario}
-            onChangeText={setCostoUnitario}
-            placeholder="0.00"
-            keyboardType="numeric"
-          />
-        </View>
-
-        <View style={[styles.fieldContainer, styles.halfWidth]}>
-          <Text style={styles.label}>Ganancia Unitaria *</Text>
-          <TextInput
-            style={styles.input}
-            value={gananciaUnitaria}
-            onChangeText={setGananciaUnitaria}
-            placeholder="0.00"
-            keyboardType="numeric"
-          />
-        </View>
-      </View>
-
-      {/* Total Calculation */}
-      {costoUnitario && gananciaUnitaria && cantidad && (
-        <View style={styles.totalContainer}>
-          <Text style={styles.totalLabel}>Total de Venta:</Text>
-          <Text style={styles.totalAmount}>
-            {cantidad} × ({costoUnitario} + {gananciaUnitaria}) = ${calculateTotal().toFixed(2)}
-          </Text>
-        </View>
-      )}
-
-      {/* Date */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Fecha</Text>
-        <View style={styles.dateContainer}>
-          <DatePickerModule
-            value={saleDate}
-            onChange={setSaleDate}
-          />
-        </View>
-      </View>
-
-      {/* Notes */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Notas (Opcional)</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={saleNotas}
-          onChangeText={setSaleNotas}
-          placeholder="Notas adicionales sobre la venta"
-          multiline
-          numberOfLines={3}
-          maxLength={500}
-        />
-        <Text style={styles.characterCount}>
-          {saleNotas.length}/500 caracteres
-        </Text>
-      </View>
-    </ScrollView>
-  );
-
-  const renderPaymentForm = () => (
-    <ScrollView
-      style={styles.formContainer}
-      contentContainerStyle={styles.formContentSpacer}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Payment Amount */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Monto del Pago *</Text>
-        <TextInput
-          style={styles.input}
-          value={montoPago}
-          onChangeText={setMontoPago}
-          placeholder="0.00"
-          keyboardType="numeric"
-        />
-      </View>
-
-      {/* Date */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Fecha</Text>
-        <View style={styles.dateContainer}>
-          <DatePickerModule
-            value={paymentDate}
-            onChange={setPaymentDate}
-          />
-        </View>
-      </View>
-
-      {/* Notes */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Notas (Opcional)</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={paymentNotas}
-          onChangeText={setPaymentNotas}
-          placeholder="Notas adicionales sobre el pago"
-          multiline
-          numberOfLines={3}
-          maxLength={500}
-        />
-        <Text style={styles.characterCount}>
-          {paymentNotas.length}/500 caracteres
-        </Text>
-      </View>
-    </ScrollView>
-  );
-
-  return (
-    <>
-      <Modal
-        visible={visible}
-        animationType="slide"
-        transparent
-        onRequestClose={onClose}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalContent}>
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerInfo}>
-                <Text style={styles.title}>Nueva Transacción</Text>
-                <Text style={styles.clientName}>{clienteName}</Text>
-              </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Tabs */}
-            <View style={styles.tabContainer}>
-              {renderTabButton('sale', 'Bajar Producto')}
-              {renderTabButton('payment', 'Cobrar')}
-            </View>
-
-            {/* Error Messages */}
-            {errors.length > 0 && (
-              <View style={styles.errorContainer}>
-                {errors.map((error, index) => (
-                  <Text key={index} style={styles.errorText}>• {error}</Text>
-                ))}
-              </View>
-            )}
-
-            {/* Form Content */}
-            <View style={styles.contentContainer}>
-              {activeTab === 'sale' ? renderSaleForm() : renderPaymentForm()}
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionContainer}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={onClose}
-                disabled={isLoading}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.submitButton,
-                  isLoading && styles.disabledButton
-                ]}
-                onPress={activeTab === 'sale' ? handleSaleSubmit : handlePaymentSubmit}
-                disabled={isLoading}
-              >
-                <Text style={styles.submitButtonText}>
-                  {isLoading ? 'Guardando...' : (activeTab === 'sale' ? 'Crear Venta' : 'Registrar Pago')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Product Selector Modal */}
-      <ProductSelector
-        visible={showProductSelector}
-        onClose={() => setShowProductSelector(false)}
-        onSelectProduct={handleProductSelect}
-        onCreateProduct={onCreateProduct}
-        selectedProductId={selectedProduct?.id}
-      />
-    </>
-  );
-}
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '92%',
-    paddingTop: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  clientName: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginHorizontal: 4,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-  },
-  activeTabButton: {
-    backgroundColor: '#25B4BD',
-  },
-  tabButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  activeTabButtonText: {
-    color: '#fff',
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    margin: 20,
-    padding: 12,
-    borderRadius: 8,
-  },
-  errorText: {
-    color: '#c62828',
-    fontSize: 14,
-  },
-  contentContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  formContainer: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  formContentSpacer: {
-    paddingBottom: 96,
-  },
-  fieldContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  productSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-  },
-  selectedProductText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  halfWidth: {
-    width: '48%',
-  },
-  totalContainer: {
-    backgroundColor: '#e8f5e8',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 14,
-    color: '#2e7d32',
-    fontWeight: '600',
-  },
-  totalAmount: {
-    fontSize: 18,
-    color: '#2e7d32',
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  dateContainer: {
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 4,
-  },
-  characterCount: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  actionContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 6,
-  },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#25B4BD',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-});
+import React, { useState, useEffect } from 'react';import {  View,  Text,  TextInput,  TouchableOpacity,  Modal,  StyleSheet,  Alert,  ScrollView,  KeyboardAvoidingView,  Platform,} from 'react-native';import { Ionicons } from '@expo/vector-icons';import { Timestamp } from 'firebase/firestore';import DatePickerModule from '@/components/DatePicker';import ProductSelector from '@/components/ProductSelector';import {  Product,  CreateSaleEventData,  CreatePaymentEventData,  CreateProductData} from '@/schemas/types';import {  createSaleEventData,  createPaymentEventData,  calculateSaleTotal} from '@/schemas/event-utils';import {  validateSaleEvent,  validatePaymentEvent} from '@/schemas/validation';interface TransactionModalProps {  visible: boolean;  onClose: () => void;  clienteId: string;  clienteName: string;  onCreateSale: (saleData: CreateSaleEventData) => Promise<void>;  onCreatePayment: (paymentData: CreatePaymentEventData) => Promise<void>;  onCreateProduct?: (productData: CreateProductData) => Promise<Product | null>;  isLoading?: boolean;}type TabType = 'sale' | 'payment';export default function TransactionModal({  visible,  onClose,  clienteId,  clienteName,  onCreateSale,  onCreatePayment,  onCreateProduct,  isLoading = false}: TransactionModalProps) {  const [activeTab, setActiveTab] = useState<TabType>('sale');  const [showProductSelector, setShowProductSelector] = useState(false);  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);  const [cantidad, setCantidad] = useState('1');  const [costoUnitario, setCostoUnitario] = useState('');  const [gananciaUnitaria, setGananciaUnitaria] = useState('');  const [saleDate, setSaleDate] = useState(new Date());  const [saleNotas, setSaleNotas] = useState('');  const [montoPago, setMontoPago] = useState('');  const [paymentDate, setPaymentDate] = useState(new Date());  const [paymentNotas, setPaymentNotas] = useState('');  const [errors, setErrors] = useState<string[]>([]);  useEffect(() => {    if (visible) {      resetForm();    }  }, [visible]);  const resetForm = () => {    setActiveTab('sale');    setSelectedProduct(null);    setCantidad('1');    setCostoUnitario('');    setGananciaUnitaria('');    setSaleDate(new Date());    setSaleNotas('');    setMontoPago('');    setPaymentDate(new Date());    setPaymentNotas('');    setErrors([]);  };  const handleProductSelect = (product: Product, cachedPrices: { ultimoCosto?: number; ultimaGanancia?: number }) => {    setSelectedProduct(product);    if (cachedPrices.ultimoCosto !== undefined) {      setCostoUnitario(cachedPrices.ultimoCosto.toString());    }    if (cachedPrices.ultimaGanancia !== undefined) {      setGananciaUnitaria(cachedPrices.ultimaGanancia.toString());    }    setShowProductSelector(false);  };  const calculateTotal = (): number => {    const qty = Number(cantidad) || 0;    const costo = Number(costoUnitario) || 0;    const ganancia = Number(gananciaUnitaria) || 0;    return calculateSaleTotal(qty, costo, ganancia);  };  const validateSaleForm = (): boolean => {    const newErrors: string[] = [];    if (!selectedProduct) {      newErrors.push('Selecciona un producto');    }    if (!cantidad || Number(cantidad) <= 0) {      newErrors.push('La cantidad debe ser mayor a 0');    }    if (!costoUnitario || Number(costoUnitario) < 0) {      newErrors.push('El costo unitario debe ser mayor o igual a 0');    }    if (!gananciaUnitaria || Number(gananciaUnitaria) < 0) {      newErrors.push('La ganancia unitaria debe ser mayor o igual a 0');    }    if (saleNotas && saleNotas.length > 500) {      newErrors.push('Las notas no pueden exceder 500 caracteres');    }    setErrors(newErrors);    return newErrors.length === 0;  };  const validatePaymentForm = (): boolean => {    const newErrors: string[] = [];    const parsedMonto = parseLocaleNumber(montoPago);    if (!montoPago || isNaN(parsedMonto) || parsedMonto <= 0) {      newErrors.push('El monto del pago debe ser mayor a 0');    }    if (paymentNotas && paymentNotas.length > 500) {      newErrors.push('Las notas no pueden exceder 500 caracteres');    }    setErrors(newErrors);    return newErrors.length === 0;  };  const handleSaleSubmit = async () => {    if (!validateSaleForm() || !selectedProduct) {      return;    }    try {      const saleData = createSaleEventData({        clienteId,        producto: selectedProduct.nombre,        cantidad: Number(cantidad),        costoUnitario: Number(costoUnitario),        gananciaUnitaria: Number(gananciaUnitaria),        fecha: Timestamp.fromDate(saleDate),        productoColor: selectedProduct.colorFondo,        notas: saleNotas.trim() || undefined      });      const validation = validateSaleEvent(saleData);      if (!validation.isValid) {        setErrors(validation.errors);        return;      }      await onCreateSale(saleData);      onClose();    } catch (error) {      console.error('Error creating sale:', error);      Alert.alert('Error', 'No se pudo crear la venta');    }  };  const handlePaymentSubmit = async () => {    if (!validatePaymentForm()) {      return;    }    try {      const parsedMonto = parseLocaleNumber(montoPago);      const paymentData = createPaymentEventData({        clienteId,        montoPago: parsedMonto,        fecha: Timestamp.fromDate(paymentDate),        notas: paymentNotas.trim() || undefined      });      const validation = validatePaymentEvent(paymentData);      if (!validation.isValid) {        setErrors(validation.errors);        return;      }      await onCreatePayment(paymentData);      onClose();    } catch (error) {      console.error('Error creating payment:', error);      Alert.alert('Error', 'No se pudo crear el pago');    }  };  const parseLocaleNumber = (value: string): number => {    if (!value) return NaN;    let sanitized = value.replace(/\s+/g, '');    if (sanitized.includes(',') && sanitized.includes('.')) {      sanitized = sanitized.replace(/\./g, '').replace(',', '.');    } else if (sanitized.includes(',')) {      sanitized = sanitized.replace(',', '.');    }    sanitized = sanitized.replace(/[^0-9.\-]/g, '');    return Number(sanitized);  };  const renderTabButton = (tab: TabType, label: string) => (    <TouchableOpacity      style={[        styles.tabButton,        activeTab === tab && styles.activeTabButton      ]}      onPress={() => setActiveTab(tab)}    >      <Text style={[        styles.tabButtonText,        activeTab === tab && styles.activeTabButtonText      ]}>        {label}      </Text>    </TouchableOpacity>  );  const renderSaleForm = () => (    <ScrollView      style={styles.formContainer}      contentContainerStyle={styles.formContentSpacer}      showsVerticalScrollIndicator={false}    >      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Producto *</Text>        <TouchableOpacity          style={[            styles.productSelector,            selectedProduct && { backgroundColor: selectedProduct.colorFondo }          ]}          onPress={() => setShowProductSelector(true)}        >          {selectedProduct ? (            <Text style={styles.selectedProductText}>{selectedProduct.nombre}</Text>          ) : (            <Text style={styles.placeholderText}>Seleccionar producto</Text>          )}          <Ionicons name="chevron-down" size={20} color={selectedProduct ? "#fff" : "#666"} />        </TouchableOpacity>      </View>      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Cantidad *</Text>        <TextInput          style={styles.input}          value={cantidad}          onChangeText={setCantidad}          placeholder="1"          keyboardType="numeric"        />      </View>      {}      <View style={styles.priceRow}>        <View style={[styles.fieldContainer, styles.halfWidth]}>          <Text style={styles.label}>Costo Unitario *</Text>          <TextInput            style={styles.input}            value={costoUnitario}            onChangeText={setCostoUnitario}            placeholder="0.00"            keyboardType="numeric"          />        </View>        <View style={[styles.fieldContainer, styles.halfWidth]}>          <Text style={styles.label}>Ganancia Unitaria *</Text>          <TextInput            style={styles.input}            value={gananciaUnitaria}            onChangeText={setGananciaUnitaria}            placeholder="0.00"            keyboardType="numeric"          />        </View>      </View>      {}      {costoUnitario && gananciaUnitaria && cantidad && (        <View style={styles.totalContainer}>          <Text style={styles.totalLabel}>Total de Venta:</Text>          <Text style={styles.totalAmount}>            {cantidad} × ({costoUnitario} + {gananciaUnitaria}) = ${calculateTotal().toFixed(2)}          </Text>        </View>      )}      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Fecha</Text>        <View style={styles.dateContainer}>          <DatePickerModule            value={saleDate}            onChange={setSaleDate}          />        </View>      </View>      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Notas (Opcional)</Text>        <TextInput          style={[styles.input, styles.textArea]}          value={saleNotas}          onChangeText={setSaleNotas}          placeholder="Notas adicionales sobre la venta"          multiline          numberOfLines={3}          maxLength={500}        />        <Text style={styles.characterCount}>          {saleNotas.length}/500 caracteres        </Text>      </View>    </ScrollView>  );  const renderPaymentForm = () => (    <ScrollView      style={styles.formContainer}      contentContainerStyle={styles.formContentSpacer}      showsVerticalScrollIndicator={false}    >      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Monto del Pago *</Text>        <TextInput          style={styles.input}          value={montoPago}          onChangeText={setMontoPago}          placeholder="0.00"          keyboardType="numeric"        />      </View>      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Fecha</Text>        <View style={styles.dateContainer}>          <DatePickerModule            value={paymentDate}            onChange={setPaymentDate}          />        </View>      </View>      {}      <View style={styles.fieldContainer}>        <Text style={styles.label}>Notas (Opcional)</Text>        <TextInput          style={[styles.input, styles.textArea]}          value={paymentNotas}          onChangeText={setPaymentNotas}          placeholder="Notas adicionales sobre el pago"          multiline          numberOfLines={3}          maxLength={500}        />        <Text style={styles.characterCount}>          {paymentNotas.length}/500 caracteres        </Text>      </View>    </ScrollView>  );  return (    <>      <Modal        visible={visible}        animationType="slide"        transparent        onRequestClose={onClose}      >        <KeyboardAvoidingView          style={styles.modalOverlay}          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}        >          <View style={styles.modalContent}>            {}            <View style={styles.header}>              <View style={styles.headerInfo}>                <Text style={styles.title}>Nueva Transacción</Text>                <Text style={styles.clientName}>{clienteName}</Text>              </View>              <TouchableOpacity onPress={onClose} style={styles.closeButton}>                <Ionicons name="close" size={24} color="#666" />              </TouchableOpacity>            </View>            {}            <View style={styles.tabContainer}>              {renderTabButton('sale', 'Bajar Producto')}              {renderTabButton('payment', 'Cobrar')}            </View>            {}            {errors.length > 0 && (              <View style={styles.errorContainer}>                {errors.map((error, index) => (                  <Text key={index} style={styles.errorText}>• {error}</Text>                ))}              </View>            )}            {}            <View style={styles.contentContainer}>              {activeTab === 'sale' ? renderSaleForm() : renderPaymentForm()}            </View>            {}            <View style={styles.actionContainer}>              <TouchableOpacity                style={[styles.button, styles.cancelButton]}                onPress={onClose}                disabled={isLoading}              >                <Text style={styles.cancelButtonText}>Cancelar</Text>              </TouchableOpacity>              <TouchableOpacity                style={[                  styles.button,                  styles.submitButton,                  isLoading && styles.disabledButton                ]}                onPress={activeTab === 'sale' ? handleSaleSubmit : handlePaymentSubmit}                disabled={isLoading}              >                <Text style={styles.submitButtonText}>                  {isLoading ? 'Guardando...' : (activeTab === 'sale' ? 'Crear Venta' : 'Registrar Pago')}                </Text>              </TouchableOpacity>            </View>          </View>        </KeyboardAvoidingView>      </Modal>      {}      <ProductSelector        visible={showProductSelector}        onClose={() => setShowProductSelector(false)}        onSelectProduct={handleProductSelect}        onCreateProduct={onCreateProduct}        selectedProductId={selectedProduct?.id}      />    </>  );}const styles = StyleSheet.create({  modalOverlay: {    flex: 1,    backgroundColor: 'rgba(0, 0, 0, 0.5)',    justifyContent: 'flex-end',  },  modalContent: {    backgroundColor: '#fff',    borderTopLeftRadius: 20,    borderTopRightRadius: 20,    height: '92%',    paddingTop: 20,  },  header: {    flexDirection: 'row',    justifyContent: 'space-between',    alignItems: 'center',    paddingHorizontal: 20,    paddingBottom: 16,    borderBottomWidth: 1,    borderBottomColor: '#eee',  },  headerInfo: {    flex: 1,  },  title: {    fontSize: 20,    fontWeight: 'bold',    color: '#333',  },  clientName: {    fontSize: 14,    color: '#666',    marginTop: 2,  },  closeButton: {    padding: 4,  },  tabContainer: {    flexDirection: 'row',    paddingHorizontal: 20,    paddingTop: 16,  },  tabButton: {    flex: 1,    paddingVertical: 12,    paddingHorizontal: 16,    borderRadius: 8,    marginHorizontal: 4,    backgroundColor: '#f5f5f5',    alignItems: 'center',  },  activeTabButton: {    backgroundColor: '#25B4BD',  },  tabButtonText: {    fontSize: 16,    fontWeight: '600',    color: '#666',  },  activeTabButtonText: {    color: '#fff',  },  errorContainer: {    backgroundColor: '#ffebee',    margin: 20,    padding: 12,    borderRadius: 8,  },  errorText: {    color: '#c62828',    fontSize: 14,  },  contentContainer: {    flex: 1,    paddingHorizontal: 20,  },  formContainer: {    flex: 1,    paddingTop: 16,  },  formContentSpacer: {    paddingBottom: 96,  },  fieldContainer: {    marginBottom: 16,  },  label: {    fontSize: 16,    fontWeight: '600',    color: '#333',    marginBottom: 8,  },  input: {    borderWidth: 1,    borderColor: '#ddd',    borderRadius: 8,    padding: 12,    fontSize: 16,    backgroundColor: '#f9f9f9',  },  textArea: {    minHeight: 80,    textAlignVertical: 'top',  },  productSelector: {    flexDirection: 'row',    alignItems: 'center',    justifyContent: 'space-between',    borderWidth: 1,    borderColor: '#ddd',    borderRadius: 8,    padding: 12,    backgroundColor: '#f9f9f9',  },  selectedProductText: {    fontSize: 16,    color: '#fff',    fontWeight: '600',    textShadowColor: 'rgba(0, 0, 0, 0.3)',    textShadowOffset: { width: 1, height: 1 },    textShadowRadius: 2,  },  placeholderText: {    fontSize: 16,    color: '#666',  },  priceRow: {    flexDirection: 'row',    justifyContent: 'space-between',  },  halfWidth: {    width: '48%',  },  totalContainer: {    backgroundColor: '#e8f5e8',    padding: 12,    borderRadius: 8,    marginBottom: 16,    alignItems: 'center',  },  totalLabel: {    fontSize: 14,    color: '#2e7d32',    fontWeight: '600',  },  totalAmount: {    fontSize: 18,    color: '#2e7d32',    fontWeight: 'bold',    marginTop: 4,  },  dateContainer: {    backgroundColor: '#f9f9f9',    borderWidth: 1,    borderColor: '#ddd',    borderRadius: 8,    padding: 4,  },  characterCount: {    fontSize: 12,    color: '#666',    textAlign: 'right',    marginTop: 4,  },  actionContainer: {    flexDirection: 'row',    paddingHorizontal: 20,    paddingVertical: 16,    borderTopWidth: 1,    borderTopColor: '#eee',  },  button: {    flex: 1,    paddingVertical: 14,    borderRadius: 8,    alignItems: 'center',    marginHorizontal: 6,  },  cancelButton: {    backgroundColor: '#f5f5f5',    borderWidth: 1,    borderColor: '#ddd',  },  cancelButtonText: {    color: '#666',    fontSize: 16,    fontWeight: '600',  },  submitButton: {    backgroundColor: '#25B4BD',  },  submitButtonText: {    color: '#fff',    fontSize: 16,    fontWeight: '600',  },  disabledButton: {    opacity: 0.6,  },});

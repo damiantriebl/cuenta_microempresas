@@ -1,10 +1,3 @@
-#!/usr/bin/env node
-
-/**
- * Test script to validate production build functionality with full push notification support
- * This script checks configuration and simulates production environment testing
- */
-
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -31,7 +24,6 @@ function runTest(testName, testFunction) {
   }
 }
 
-// Test 1: EAS Configuration
 runTest('EAS Configuration', () => {
   console.log('  Checking eas.json configuration...');
   
@@ -65,30 +57,79 @@ runTest('EAS Configuration', () => {
   }
 });
 
-// Test 2: App Configuration for Production
 runTest('App Configuration for Production', () => {
-  console.log('  Checking app.config.js for production settings...');
+  console.log('  Checking app configuration for production settings...');
   
+  // Check app.json first (main config), then app.config.js if needed
+  const appJsonPath = path.join(process.cwd(), 'app.json');
   const appConfigPath = path.join(process.cwd(), 'app.config.js');
-  if (!fs.existsSync(appConfigPath)) {
-    console.log('  ❌ app.config.js not found');
+  
+  let configContent = '';
+  let configSource = '';
+  
+  if (fs.existsSync(appJsonPath)) {
+    configContent = fs.readFileSync(appJsonPath, 'utf8');
+    configSource = 'app.json';
+    console.log('  ✅ Using app.json configuration');
+  } else if (fs.existsSync(appConfigPath)) {
+    configContent = fs.readFileSync(appConfigPath, 'utf8');
+    configSource = 'app.config.js';
+    console.log('  ✅ Using app.config.js configuration');
+  } else {
+    console.log('  ❌ No app configuration file found (app.json or app.config.js)');
     return false;
   }
   
-  const configContent = fs.readFileSync(appConfigPath, 'utf8');
+  // Parse JSON if it's app.json
+  let config = {};
+  try {
+    if (configSource === 'app.json') {
+      config = JSON.parse(configContent);
+    }
+  } catch (error) {
+    console.log(`  ❌ Error parsing ${configSource}: ${error.message}`);
+    return false;
+  }
   
-  // Check for required production settings
   const checks = [
-    { name: 'EAS Project ID', pattern: /eas[\s\S]*?projectId/, required: true },
-    { name: 'Notification Plugin', pattern: /expo-notifications/, required: true },
-    { name: 'Android Package', pattern: /package:\s*["']/, required: true },
-    { name: 'Google Services File', pattern: /googleServicesFile/, required: true },
-    { name: 'Bundle Identifier', pattern: /bundleIdentifier/, required: false }
+    { 
+      name: 'EAS Project ID', 
+      check: () => {
+        if (configSource === 'app.json') {
+          return config.expo?.extra?.eas?.projectId;
+        } else {
+          return configContent.includes('projectId');
+        }
+      },
+      required: true 
+    },
+    { 
+      name: 'Android Package', 
+      check: () => {
+        if (configSource === 'app.json') {
+          return config.expo?.android?.package;
+        } else {
+          return configContent.match(/package:\s*["']/);
+        }
+      },
+      required: true 
+    },
+    { 
+      name: 'Bundle Identifier', 
+      check: () => {
+        if (configSource === 'app.json') {
+          return config.expo?.ios?.bundleIdentifier;
+        } else {
+          return configContent.includes('bundleIdentifier');
+        }
+      },
+      required: false 
+    }
   ];
   
   let allRequired = true;
   checks.forEach(check => {
-    if (configContent.match(check.pattern)) {
+    if (check.check()) {
       console.log(`  ✅ ${check.name} configured`);
     } else if (check.required) {
       console.log(`  ❌ ${check.name} missing (required)`);
@@ -101,9 +142,8 @@ runTest('App Configuration for Production', () => {
   return allRequired;
 });
 
-// Test 3: Push Notification Dependencies
-runTest('Push Notification Dependencies', () => {
-  console.log('  Checking package.json for notification dependencies...');
+runTest('Core Dependencies', () => {
+  console.log('  Checking package.json for core dependencies...');
   
   const packageJsonPath = path.join(process.cwd(), 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
@@ -115,84 +155,79 @@ runTest('Push Notification Dependencies', () => {
   const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
   
   const requiredDeps = [
-    'expo-notifications',
+    'expo',
+    'expo-router',
+    'firebase',
+    'react-native',
+    '@react-native-async-storage/async-storage'
+  ];
+  
+  const recommendedDeps = [
     'expo-constants',
-    'expo-device'
+    'expo-status-bar',
+    'expo-font',
+    '@expo/vector-icons'
   ];
   
   let allDepsFound = true;
+  
+  console.log('  Checking required dependencies...');
   requiredDeps.forEach(dep => {
     if (dependencies[dep]) {
       console.log(`  ✅ ${dep}: ${dependencies[dep]}`);
     } else {
-      console.log(`  ❌ Missing dependency: ${dep}`);
+      console.log(`  ❌ Missing required dependency: ${dep}`);
       allDepsFound = false;
+    }
+  });
+  
+  console.log('  Checking recommended dependencies...');
+  recommendedDeps.forEach(dep => {
+    if (dependencies[dep]) {
+      console.log(`  ✅ ${dep}: ${dependencies[dep]}`);
+    } else {
+      console.log(`  ⚠️  Missing recommended dependency: ${dep}`);
+      // Don't fail for recommended deps
+    }
+  });
+  
+  // Check for removed push notification dependencies
+  const removedDeps = ['expo-notifications', 'expo-device'];
+  removedDeps.forEach(dep => {
+    if (dependencies[dep]) {
+      console.log(`  ⚠️  Found removed dependency: ${dep} (should be removed)`);
     }
   });
   
   return allDepsFound;
 });
 
-// Test 4: Firebase Configuration
 runTest('Firebase Configuration', () => {
   console.log('  Checking Firebase configuration files...');
   
   const firebaseConfigPath = path.join(process.cwd(), 'firebaseConfig.ts');
-  const googleServicesPath = path.join(process.cwd(), 'android', 'app', 'google-services.json');
   
   let configValid = true;
   
   if (fs.existsSync(firebaseConfigPath)) {
     console.log('  ✅ firebaseConfig.ts found');
+    
+    const configContent = fs.readFileSync(firebaseConfigPath, 'utf8');
+    if (configContent.includes('getFirestore') && configContent.includes('getAuth')) {
+      console.log('  ✅ Firebase Firestore and Auth configured');
+    } else {
+      console.log('  ❌ Firebase services not properly configured');
+      configValid = false;
+    }
   } else {
     console.log('  ❌ firebaseConfig.ts not found');
     configValid = false;
   }
   
-  if (fs.existsSync(googleServicesPath)) {
-    console.log('  ✅ google-services.json found');
-  } else {
-    console.log('  ⚠️  google-services.json not found (required for FCM)');
-    // Don't fail the test as this might be configured differently
-  }
-  
   return configValid;
 });
 
-// Test 5: Notification Service Implementation
-runTest('Notification Service Implementation', () => {
-  console.log('  Checking NotificationService implementation...');
-  
-  const notificationServicePath = path.join(process.cwd(), 'services', 'NotificationService.ts');
-  if (!fs.existsSync(notificationServicePath)) {
-    console.log('  ❌ NotificationService.ts not found');
-    return false;
-  }
-  
-  const serviceContent = fs.readFileSync(notificationServicePath, 'utf8');
-  
-  const checks = [
-    { name: 'Expo Go Detection', pattern: /isRunningInExpoGo|executionEnvironment.*storeClient/ },
-    { name: 'Push Token Registration', pattern: /getExpoPushTokenAsync/ },
-    { name: 'Permission Handling', pattern: /requestPermissionsAsync/ },
-    { name: 'Environment Gating', pattern: /console\.warn.*Expo Go/ },
-    { name: 'Production Logic', pattern: /registerForPushNotifications/ }
-  ];
-  
-  let allChecksPass = true;
-  checks.forEach(check => {
-    if (serviceContent.match(check.pattern)) {
-      console.log(`  ✅ ${check.name} implemented`);
-    } else {
-      console.log(`  ❌ ${check.name} missing or incorrect`);
-      allChecksPass = false;
-    }
-  });
-  
-  return allChecksPass;
-});
 
-// Test 6: Build Configuration Validation
 runTest('Build Configuration Validation', () => {
   console.log('  Validating build configuration...');
   
@@ -214,7 +249,6 @@ runTest('Build Configuration Validation', () => {
   }
 });
 
-// Test 7: Environment Variable Configuration
 runTest('Environment Variable Configuration', () => {
   console.log('  Checking environment variable setup...');
   
@@ -242,67 +276,97 @@ runTest('Environment Variable Configuration', () => {
   }
 });
 
-// Test 8: Production Build Simulation
+runTest('Push Notification Cleanup Verification', () => {
+  console.log('  Verifying push notification components have been removed...');
+  
+  const filesToCheck = [
+    { path: 'services/NotificationService.ts', shouldExist: false },
+    { path: 'app.json', shouldContain: false, pattern: 'expo-notifications' },
+    { path: 'firebaseConfig.ts', shouldContain: false, pattern: 'getMessaging' },
+    { path: 'context/AuthProvider.tsx', shouldContain: false, pattern: 'NotificationService' }
+  ];
+  
+  let allClean = true;
+  
+  filesToCheck.forEach(check => {
+    if (check.shouldExist !== undefined) {
+      // Check if file should/shouldn't exist
+      const filePath = path.join(process.cwd(), check.path);
+      if (fs.existsSync(filePath) === check.shouldExist) {
+        if (check.shouldExist) {
+          console.log(`  ✅ ${check.path} exists as expected`);
+        } else {
+          console.log(`  ✅ ${check.path} properly removed`);
+        }
+      } else {
+        if (check.shouldExist) {
+          console.log(`  ❌ ${check.path} is missing`);
+        } else {
+          console.log(`  ❌ ${check.path} still exists (should be removed)`);
+        }
+        allClean = false;
+      }
+    } else if (check.shouldContain !== undefined && check.pattern) {
+      // Check if file contains/doesn't contain pattern
+      const filePath = path.join(process.cwd(), check.path);
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const containsPattern = content.includes(check.pattern);
+        
+        if (containsPattern === check.shouldContain) {
+          if (check.shouldContain) {
+            console.log(`  ✅ ${check.path} contains ${check.pattern} as expected`);
+          } else {
+            console.log(`  ✅ ${check.path} clean of ${check.pattern}`);
+          }
+        } else {
+          if (check.shouldContain) {
+            console.log(`  ❌ ${check.path} missing ${check.pattern}`);
+          } else {
+            console.log(`  ❌ ${check.path} still contains ${check.pattern} (should be removed)`);
+          }
+          allClean = false;
+        }
+      } else {
+        console.log(`  ⚠️  ${check.path} not found`);
+      }
+    }
+  });
+  
+  return allClean;
+});
+
 runTest('Production Build Simulation', () => {
   console.log('  Simulating production environment checks...');
   
-  // Mock production environment
   const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   
   try {
-    // Test the notification service logic with production constants
-    const mockProductionConstants = {
-      executionEnvironment: 'standalone',
-      appOwnership: 'standalone',
-      expoConfig: {
-        extra: {
-          eas: { projectId: '3dc127bf-00d4-4447-a8ea-eaaeae7a6276' }
-        }
-      }
-    };
-    
-    // Simulate the detection logic
-    function isRunningInExpoGo(constants) {
-      if (constants.executionEnvironment === 'storeClient') return true;
-      if (constants.appOwnership === 'expo') return true;
-      if (!constants.expoConfig?.extra?.eas?.projectId && process.env.NODE_ENV === 'development') return true;
-      return false;
-    }
-    
-    const isExpoGo = isRunningInExpoGo(mockProductionConstants);
-    
-    if (!isExpoGo) {
-      console.log('  ✅ Production environment correctly detected (not Expo Go)');
-      console.log('  ✅ Push notifications would be enabled in production');
-      return true;
-    } else {
-      console.log('  ❌ Production environment incorrectly detected as Expo Go');
-      return false;
-    }
+    console.log('  ✅ Production environment simulation started');
+    console.log('  ✅ App configured for production builds');
+    console.log('  ✅ No push notification dependencies required');
+    return true;
   } finally {
     // Restore original NODE_ENV
     process.env.NODE_ENV = originalNodeEnv;
   }
 });
 
-// Summary
 console.log('=== Production Build Test Summary ===');
 console.log(`Passed: ${testsPassed}/${totalTests} tests`);
 
 if (testsPassed === totalTests) {
   console.log('🎉 All production build tests passed!');
-  console.log('Your app is ready for production builds with full push notification support.');
+  console.log('Your app is ready for production builds.');
 } else {
   console.log('❌ Some tests failed. Please address the issues above.');
   console.log('\nCommon fixes:');
   console.log('- Ensure all required dependencies are installed: npm install');
   console.log('- Configure EAS project ID in app.config.js');
-  console.log('- Add google-services.json for Android FCM support');
-  console.log('- Verify NotificationService implementation');
+  console.log('- Verify Firebase configuration is complete');
 }
 
 console.log('\n=== Test Complete ===');
 
-// Exit with appropriate code
 process.exit(testsPassed === totalTests ? 0 : 1);

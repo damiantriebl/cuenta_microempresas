@@ -24,36 +24,25 @@ import {
   COLLECTIONS
 } from '@/schemas/types';
 import { validateClient } from '@/schemas/validation';
-
 export class ClientService {
   private empresaId: string;
-
   constructor(empresaId: string) {
     this.empresaId = empresaId;
   }
-
   private getClientCollection() {
     return collection(db, COLLECTIONS.EMPRESAS, this.empresaId, COLLECTIONS.CLIENTES);
   }
-
   private getClientDoc(clientId: string) {
     return doc(db, COLLECTIONS.EMPRESAS, this.empresaId, COLLECTIONS.CLIENTES, clientId);
   }
-
-  /**
-   * Create a new client
-   */
   async createClient(clientData: CreateClientData): Promise<ServiceResponse<string>> {
     const context = 'ClientService.createClient';
-
-    console.log(`${context}: Starting client creation`, {
+    console.log(`${context}: Iniciando cliente creation`, {
       empresaId: this.empresaId,
       clientName: clientData.nombre
     });
-
     try {
-      // Step 1: Validate client data
-      console.log(`${context}: Validating client data`);
+      console.log(`${context}: Validando cliente data`);
       const validation = validateClient(clientData);
       if (!validation.isValid) {
         console.error(`${context}: Validation failed`, { errors: validation.errors });
@@ -62,30 +51,22 @@ export class ClientService {
           errors: validation.errors
         };
       }
-
-      console.log(`${context}: Validation passed`);
-
-      // Step 2: Prepare client document
+      console.log(`${context}: Validación passed`);
       const clientDoc = {
         ...clientData,
         deudaActual: 0, // Initialize with no debt
         creado: Timestamp.now(),
         actualizado: Timestamp.now()
       };
-
-      // Step 3: Add to Firestore
       const docRef = await addDoc(this.getClientCollection(), clientDoc);
-
-      console.log(`${context}: Client created successfully`, { 
+      console.log(`${context}: Cliente creado exitosamente`, { 
         clientId: docRef.id,
         clientName: clientData.nombre 
       });
-
       return {
         success: true,
         data: docRef.id
       };
-
     } catch (error) {
       console.error(`${context}: Client creation failed`, error);
       return {
@@ -94,22 +75,15 @@ export class ClientService {
       };
     }
   }
-
-  /**
-   * Get all clients for the company
-   */
   async getClients(): Promise<ServiceResponse<Client[]>> {
     const context = 'ClientService.getClients';
-
     try {
       const q = query(
         this.getClientCollection(),
         orderBy('nombre', 'asc')
       );
-
       const querySnapshot = await getDocs(q);
       const clients: Client[] = [];
-
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         clients.push({
@@ -121,14 +95,11 @@ export class ClientService {
           fechaImportante: data.fechaImportante || null
         } as Client);
       });
-
-      console.log(`${context}: Retrieved ${clients.length} clients`);
-
+      console.log(`${context}: Obtenido ${clients.length} clients`);
       return {
         success: true,
         data: clients
       };
-
     } catch (error) {
       console.error(`${context}: Failed to get clients`, error);
       return {
@@ -137,15 +108,9 @@ export class ClientService {
       };
     }
   }
-
-  /**
-   * Update an existing client
-   */
   async updateClient(clientId: string, updateData: UpdateClientData): Promise<ServiceResponse<void>> {
     const context = 'ClientService.updateClient';
-
     try {
-      // Validate update data if needed
       if (updateData.nombre !== undefined) {
         const validation = validateClient({ ...updateData, nombre: updateData.nombre } as CreateClientData);
         if (!validation.isValid) {
@@ -155,22 +120,16 @@ export class ClientService {
           };
         }
       }
-
-      // Add timestamp
-      const updateDoc = {
+      const updateDocData = {
         ...updateData,
         actualizado: Timestamp.now()
       };
-
-      await updateDoc(this.getClientDoc(clientId), updateDoc);
-
-      console.log(`${context}: Client updated successfully`, { clientId });
-
+      await updateDoc(this.getClientDoc(clientId), updateDocData);
+      console.log(`${context}: Cliente actualizado exitosamente`, { clientId });
       return {
         success: true,
         data: undefined
       };
-
     } catch (error) {
       console.error(`${context}: Client update failed`, error);
       return {
@@ -179,23 +138,15 @@ export class ClientService {
       };
     }
   }
-
-  /**
-   * Delete a client
-   */
   async deleteClient(clientId: string): Promise<ServiceResponse<void>> {
     const context = 'ClientService.deleteClient';
-
     try {
       await deleteDoc(this.getClientDoc(clientId));
-
-      console.log(`${context}: Client deleted successfully`, { clientId });
-
+      console.log(`${context}: Cliente eliminado exitosamente`, { clientId });
       return {
         success: true,
         data: undefined
       };
-
     } catch (error) {
       console.error(`${context}: Client deletion failed`, error);
       return {
@@ -204,23 +155,16 @@ export class ClientService {
       };
     }
   }
-
-  /**
-   * Get a single client by ID
-   */
   async getClient(clientId: string): Promise<ServiceResponse<Client | null>> {
     const context = 'ClientService.getClient';
-
     try {
       const docSnap = await getDoc(this.getClientDoc(clientId));
-
       if (!docSnap.exists()) {
         return {
           success: true,
           data: null
         };
       }
-
       const data = docSnap.data();
       const client: Client = {
         id: docSnap.id,
@@ -230,12 +174,10 @@ export class ClientService {
         actualizado: data.actualizado,
         fechaImportante: data.fechaImportante || null
       } as Client;
-
       return {
         success: true,
         data: client
       };
-
     } catch (error) {
       console.error(`${context}: Failed to get client`, error);
       return {
@@ -244,19 +186,13 @@ export class ClientService {
       };
     }
   }
-
-  /**
-   * Subscribe to client changes
-   */
   subscribeToClients(callback: (clients: Client[]) => void) {
     const q = query(
       this.getClientCollection(),
       orderBy('nombre', 'asc')
     );
-
     return onSnapshot(q, (querySnapshot) => {
       const clients: Client[] = [];
-
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         clients.push({
@@ -268,34 +204,23 @@ export class ClientService {
           fechaImportante: data.fechaImportante || null
         } as Client);
       });
-
       callback(clients);
     });
   }
-
-  /**
-   * Search clients by name
-   */
   async searchClients(searchTerm: string): Promise<ServiceResponse<Client[]>> {
     const context = 'ClientService.searchClients';
-
     try {
-      // Get all clients and filter locally (Firestore doesn't support case-insensitive search)
       const result = await this.getClients();
-      
       if (!result.success) {
         return result;
       }
-
       const filteredClients = result.data!.filter(client =>
         client.nombre.toLowerCase().includes(searchTerm.toLowerCase())
       );
-
       return {
         success: true,
         data: filteredClients
       };
-
     } catch (error) {
       console.error(`${context}: Search failed`, error);
       return {
@@ -304,24 +229,55 @@ export class ClientService {
       };
     }
   }
-
-  /**
-   * Recalculate debt for a specific client (utility function)
-   */
+  async toggleClientVisibility(clientId: string): Promise<{ success: boolean; isHidden?: boolean; error?: string }> {
+    const context = 'ClientService.toggleClientVisibility';
+    try {
+      const clientResult = await this.getClient(clientId);
+      if (!clientResult.success || !clientResult.data) {
+        return {
+          success: false,
+          error: 'Cliente no encontrado'
+        };
+      }
+      const client = clientResult.data;
+      const newHiddenState = !client.oculto;
+      const updateResult = await this.updateClient(clientId, {
+        oculto: newHiddenState
+      });
+      if (updateResult.success) {
+        console.log(`${context}: Cliente visibilidad cambiado exitosamente`, { 
+          clientId, 
+          wasHidden: client.oculto, 
+          nowHidden: newHiddenState 
+        });
+        return {
+          success: true,
+          isHidden: newHiddenState
+        };
+      } else {
+        return {
+          success: false,
+          error: updateResult.errors?.join('\n') || 'Error al cambiar visibilidad'
+        };
+      }
+    } catch (error) {
+      console.error(`${context}: Failed to toggle visibility`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+    }
+  }
   async recalculateClientDebt(clientId: string): Promise<ServiceResponse<void>> {
     const context = 'ClientService.recalculateClientDebt';
-
     try {
       const { recalculateAndUpdateClientDebt } = await import('@/schemas/firestore-utils');
       await recalculateAndUpdateClientDebt(this.empresaId, clientId);
-
-      console.log(`${context}: Debt recalculated successfully for client ${clientId}`);
-
+      console.log(`${context}: Deuda recalculado exitosamente for cliente ${clientId}`);
       return {
         success: true,
         data: undefined
       };
-
     } catch (error) {
       console.error(`${context}: Failed to recalculate debt`, error);
       return {
@@ -331,5 +287,4 @@ export class ClientService {
     }
   }
 }
-
 export default ClientService;

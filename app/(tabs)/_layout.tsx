@@ -2,13 +2,10 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-
 import { HapticTab } from '@/components/HapticTab';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
-
 export default function TabLayout() {
-
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
@@ -18,7 +15,6 @@ export default function TabLayout() {
             tabBarActiveTintColor: '#20B2AA', // Turquoise del logo
             tabBarInactiveTintColor: '#666666', // Secondary text color
             headerShown: false,
-            // tabBarButton: HapticTab, // Still disabled, testing TabBarBackground first
             tabBarBackground: TabBarBackground,
             tabBarStyle: {
               backgroundColor: '#ffffff',
@@ -40,8 +36,7 @@ export default function TabLayout() {
               marginTop: 4,
             },
           }}>
-
-          {/* Config Tab - Products and Company Management */}
+          {}
           <Tabs.Screen
             name="index"
             options={{
@@ -55,8 +50,7 @@ export default function TabLayout() {
               ),
             }}
           />
-
-          {/* Clients Tab - Client Management */}
+          {}
           <Tabs.Screen
             name="clientes/index"
             options={{
@@ -70,8 +64,7 @@ export default function TabLayout() {
               ),
             }}
           />
-
-          {/* History Tab - Transaction History */}
+          {}
           <Tabs.Screen
             name="history"
             options={{
@@ -85,15 +78,13 @@ export default function TabLayout() {
               ),
             }}
           />
-
-          {/* Hide client detail routes from tabs */}
+          {}
           <Tabs.Screen
             name="clientes/[id]"
             options={{
               href: null, // This hides it from the tab bar
             }}
           />
-
           <Tabs.Screen
             name="clientes/[id]_new"
             options={{

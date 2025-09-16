@@ -34,25 +34,20 @@ import DatePickerModule from '@/components/DatePicker';
 import { timestampToDate } from '@/hooks/timestampToDate';
 import calcularTiempoDesde from '@/hooks/calcularTiempoDesde';
 import { useAuth } from '@/context/AuthProvider';
-
 type ProductoItem = {
   id: string;
   input: string;
   color: string;
   tipo: 'input' | 'entrego';
 };
-
 type DisplaySeparator = { type: 'separator'; id: string };
 type DisplayEvent = { type: 'event'; event: (EventoTy & { acumulado: number }) };
 type DisplayItem = DisplaySeparator | DisplayEvent;
-
 export default function EventsScreen() {
   const [eventos, setEventos] = useState<(EventoTy & { acumulado: number })[]>([]);
   const { id: idCliente } = useLocalSearchParams();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-
-  // Form state
   const [tipo, setTipo] = useState<'bajar' | 'entrego'>('bajar');
   const [notas, setNotas] = useState('');
   const [borrado, setBorrado] = useState(false);
@@ -73,8 +68,6 @@ export default function EventsScreen() {
   });
   const [precioActual, setPrecioActual] = useState(precioHistorico.precio.toString());
   const { empresaId } = useAuth();
-
-
   const fetchEvents = async () => {
     if (!empresaId) return;
     const q = query(
@@ -87,7 +80,6 @@ export default function EventsScreen() {
     let acumulado = 0;
     const eventosWithAcumulado = eventosData.map((evento: any) => {
       let valorEvento = 0;
-
       if (evento.tipo === 'bajar') {
         const cantidad = evento.cantidad ?? 0;
         const precioUnitario = evento.precioUnitario ?? 0;
@@ -97,18 +89,14 @@ export default function EventsScreen() {
       } else if (evento.tipo === 'entrego') {
         valorEvento = evento.monto ?? 0;
       }
-
       acumulado += valorEvento;
       return { ...evento, acumulado };
     });
-
     setEventos(eventosWithAcumulado.reverse() as (EventoTy & { acumulado: number })[]);
   };
-
   useEffect(() => {
     fetchEvents();
   }, [idCliente, empresaId]);
-
   const fetchProducts = async () => {
     try {
       if (!empresaId) return;
@@ -119,17 +107,14 @@ export default function EventsScreen() {
         const items = data.items || [];
         setProductos(items);
       } else {
-        // Fallback a configuración antigua en raíz y migración
         const legacyRef = doc(db, 'configuracion', 'productos');
         const legacySnap = await getDoc(legacyRef);
         if (legacySnap.exists()) {
           const data = legacySnap.data();
           const items = data.items || [];
           setProductos(items);
-          // migrar copia al espacio de la empresa
           await setDoc(productsDocRef, { items });
         } else {
-          console.log('No hay productos configurados');
         }
       }
     } catch (error) {
@@ -150,22 +135,18 @@ export default function EventsScreen() {
           fecha: timestampToDate(latestPrice.fecha)
         });
         setPrecioActual(latestPrice.precio.toString());
-        console.log('Último precio:', latestPrice);
       } else {
-        console.log('No hay datos en precioHistorico');
       }
     } catch (error) {
       console.error('Error al obtener el último precio:', error);
       alert('Error al obtener el último precio');
     }
   };
-
   useEffect(() => {
     fetchEvents();
     fetchProducts();
     fetchLatestPrice()
   }, [idCliente, empresaId]);
-
   const handleSaveEvent = async () => {
     try {
       const newEventBase = {
@@ -176,15 +157,12 @@ export default function EventsScreen() {
         creado: Timestamp.fromDate(creado),
         actualizado: Timestamp.fromDate(actualizado),
       };
-
       let newEvent: any;
-
       if (tipo === 'bajar') {
         if (!cantidad || !precioUnitario || !producto.trim()) {
           Alert.alert('Error', 'Por favor complete todos los campos para un evento de tipo Bajar.');
           return;
         }
-
         newEvent = {
           ...newEventBase,
           tipo: 'bajar',
@@ -199,14 +177,12 @@ export default function EventsScreen() {
           Alert.alert('Error', 'Por favor ingrese el monto para un evento de tipo Entrego.');
           return;
         }
-
         newEvent = {
           ...newEventBase,
           tipo: 'entrego',
           monto: parseFloat(monto),
         };
       }
-
       if (!empresaId) return;
       if (editingEventId) {
         await updateDoc(doc(db, 'empresas', empresaId, 'clientes', idCliente as string, 'eventos', editingEventId), newEvent);
@@ -214,7 +190,6 @@ export default function EventsScreen() {
       } else {
         await addDoc(collection(db, 'empresas', empresaId, 'clientes', idCliente as string, 'eventos'), newEvent);
       }
-
       setModalVisible(false);
       Alert.alert('Éxito', 'Evento guardado con éxito.');
       resetForm();
@@ -224,7 +199,6 @@ export default function EventsScreen() {
       Alert.alert('Error', 'No se pudo guardar el evento.');
     }
   };
-
   const handleEditEvent = (event: EventoTy & { acumulado: number }) => {
     setEditingEventId(event.id);
     setTipo(event.tipo);
@@ -244,7 +218,6 @@ export default function EventsScreen() {
     }
     setModalVisible(true);
   };
-
   const resetForm = () => {
     setTipo('bajar');
     setNotas('');
@@ -258,14 +231,11 @@ export default function EventsScreen() {
     setProductoColor('');
     setMonto('');
   };
-
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
         <Text style={styles.addButtonText}>Agregar Evento</Text>
       </TouchableOpacity>
-
-      {/* Existing event list with zero-debt separator and split overpayments */}
       <ScrollView style={styles.eventListContainer}>
         {eventos.length === 0 ? (
           <Text style={styles.loadingText}>Cargando eventos...</Text>
@@ -280,7 +250,6 @@ export default function EventsScreen() {
                 const monto = e.monto ?? 0;
                 const needed = -prevAcum;
                 if (monto > needed) {
-                  // part to reach zero
                   const part1 = { ...e, id: e.id + '-part1', monto: needed, acumulado: 0 } as (EventoTy & { acumulado: number });
                   itemsAsc.push({ type: 'event', event: part1 });
                   itemsAsc.push({ type: 'separator', id: e.id + '-sep' });
@@ -318,8 +287,7 @@ export default function EventsScreen() {
           })()
         )}
       </ScrollView>
-
-      {/* Modal Component */}
+      {}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -327,8 +295,6 @@ export default function EventsScreen() {
       >
         <ScrollView contentContainerStyle={styles.modalContainer}>
           <Text style={styles.modalTitle}>{editingEventId ? 'Editar Evento' : 'Agregar Nuevo Evento'}</Text>
-
-          {/* Tipo Selection */}
           <View style={styles.section}>
             <Text style={styles.label}>Tipo de Evento:</Text>
             <View style={styles.tipoContainer}>
@@ -346,10 +312,7 @@ export default function EventsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* General Information */}
           <View style={styles.section}>
-            {/* Conditional Fields Based on Tipo */}
             {tipo === 'bajar' ? (
               <View style={styles.sectionBolsa}>
                 <View style={styles.tipoContainer}>
@@ -384,7 +347,6 @@ export default function EventsScreen() {
                   }} placeholder="Cantidad"
                   keyboardType="numeric"
                 />
-
                 <Text style={styles.label}>Precio Unitario:</Text>
                 <TextInput
                   style={styles.input}
@@ -433,22 +395,18 @@ export default function EventsScreen() {
                 />
               </View>
             )}
-
-            {/* Fechas */}
             <View style={styles.section}>
               <Text style={styles.label}>Creado:</Text>
               <DatePickerModule
                 value={creado}
                 onChange={(selectedDate) => setCreado(selectedDate)}
               />
-
               <Text style={styles.label}>Actualizado:</Text>
               <DatePickerModule
                 value={actualizado}
                 onChange={(selectedDate) => setActualizado(selectedDate)}
               />
             </View>
-
             <Text style={styles.label}>Notas:</Text>
             <TextInput
               style={styles.input}
@@ -457,7 +415,6 @@ export default function EventsScreen() {
               placeholder="Agregar notas"
               multiline
             />
-            {/* Borrado & Editado Switch */}
             <View style={styles.tipoContainer}>
               <View style={styles.switchContainer}>
                 <Text style={styles.label}>Borrado:</Text>
@@ -469,7 +426,6 @@ export default function EventsScreen() {
               </View>
             </View>
           </View>
-          {/* Submit Button */}
           <View style={styles.submitButtonContainer}>
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveEvent}>
               <Text style={styles.saveButtonText}>Guardar Evento</Text>
@@ -486,8 +442,6 @@ export default function EventsScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
-
-        {/* Product Picker Modal */}
         <Modal
           visible={showProductPicker}
           animationType="slide"

@@ -4,19 +4,15 @@ import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { EventoTy } from '@/schemas/eventoTy';
 import { formatDateToSpanish } from '@/hooks/timestampToDate';
-
 type EventModuleProps = EventoTy & {
     acumulado: number;
     handleEditEvento: () => void;
 };
-
 const EventModule = ({ handleEditEvento, ...eventos }: EventModuleProps) => {
     const [modalVisible, setModalVisible] = useState(false);
-
     const handleToggleModal = () => {
         setModalVisible(!modalVisible);
     };
-
     return (
         <View style={[
             styles.card,
@@ -27,7 +23,6 @@ const EventModule = ({ handleEditEvento, ...eventos }: EventModuleProps) => {
             <TouchableOpacity onPress={handleEditEvento} style={styles.editIconContainer}>
                 <Ionicons name="create-outline" size={24} color={'black'} />
             </TouchableOpacity>
-
             <View style={styles.column}>
                 {eventos.tipo === 'bajar' ? (
                     <View style={styles.column}>
@@ -50,7 +45,6 @@ const EventModule = ({ handleEditEvento, ...eventos }: EventModuleProps) => {
                     <ThemedText type="subtitle">{formatDateToSpanish(eventos.actualizado)}</ThemedText>
                 )}
             </View>
-
             <TouchableOpacity onPress={handleToggleModal} style={styles.infoIconContainer}>
                 <Ionicons
                     name="information-circle-outline"
@@ -58,7 +52,6 @@ const EventModule = ({ handleEditEvento, ...eventos }: EventModuleProps) => {
                     color={!!eventos.notas ? 'black' : 'grey'}
                 />
             </TouchableOpacity>
-
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -78,7 +71,6 @@ const EventModule = ({ handleEditEvento, ...eventos }: EventModuleProps) => {
         </View>
     );
 };
-
 const styles = StyleSheet.create({
     column: {
         flexDirection: 'column',
@@ -133,5 +125,4 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
 });
-
 export default EventModule;

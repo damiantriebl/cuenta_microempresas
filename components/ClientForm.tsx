@@ -1,767 +1,1 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  Switch
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Timestamp } from 'firebase/firestore';
-import DatePickerModule from '@/components/DatePicker';
-import { Client, CreateClientData, UpdateClientData } from '@/schemas/types';
-import { validateClient } from '@/schemas/validation';
-import { useToast } from '@/context/ToastProvider';
-import LoadingOverlay from '@/components/ui/LoadingOverlay';
-
-interface ClientFormProps {
-  client?: Client; // If provided, form is in edit mode
-  onSave: (clientData: CreateClientData | UpdateClientData) => Promise<void>;
-  onCancel: () => void;
-  isLoading?: boolean;
-}
-
-export default function ClientForm({ client, onSave, onCancel, isLoading = false }: ClientFormProps) {
-  const [formData, setFormData] = useState({
-    nombre: '',
-    direccion: '',
-    telefono: '',
-    notas: '',
-    fechaImportante: null as Date | null,
-    oculto: false
-  });
-
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
-  const [touched, setTouched] = useState<{[key: string]: boolean}>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [canCancel, setCanCancel] = useState(true);
-  
-  const { showToast } = useToast();
-
-  // Initialize form with client data if editing
-  useEffect(() => {
-    if (client) {
-      setFormData({
-        nombre: client.nombre,
-        direccion: client.direccion,
-        telefono: client.telefono,
-        notas: client.notas || '',
-        fechaImportante: client.fechaImportante ? client.fechaImportante.toDate() : null,
-        oculto: client.oculto
-      });
-    }
-    // Reset validation states
-    setErrors({});
-    setFieldErrors({});
-    setTouched({});
-    setIsSubmitting(false);
-    setCanCancel(true);
-  }, [client]);
-
-  // Real-time validation for individual fields
-  const validateField = useCallback((fieldName: string, value: any): string => {
-    switch (fieldName) {
-      case 'nombre':
-        if (!value || !value.trim()) {
-          return 'El nombre del cliente es requerido';
-        }
-        if (value.trim().length < 2) {
-          return 'El nombre debe tener al menos 2 caracteres';
-        }
-        if (value.trim().length > 100) {
-          return 'El nombre no puede exceder 100 caracteres';
-        }
-        return '';
-      
-      case 'direccion':
-        if (!value || !value.trim()) {
-          return 'La dirección es requerida';
-        }
-        if (value.trim().length < 5) {
-          return 'La dirección debe tener al menos 5 caracteres';
-        }
-        if (value.trim().length > 200) {
-          return 'La dirección no puede exceder 200 caracteres';
-        }
-        return '';
-      
-      case 'telefono':
-        if (!value || !value.trim()) {
-          return 'El teléfono es requerido';
-        }
-        
-        // Enhanced phone validation
-        const phoneRegex = /^[\d\s\+\-\(\)]+$/;
-        const cleanPhone = value.replace(/\D/g, '');
-        
-        if (!phoneRegex.test(value)) {
-          return 'El teléfono solo puede contener números, espacios, +, -, (, )';
-        }
-        
-        if (cleanPhone.length < 7) {
-          return 'El teléfono debe tener al menos 7 dígitos';
-        }
-        
-        if (cleanPhone.length > 15) {
-          return 'El teléfono no puede tener más de 15 dígitos';
-        }
-        
-        // Check for common invalid patterns
-        if (/^0+$/.test(cleanPhone) || /^1+$/.test(cleanPhone)) {
-          return 'Ingrese un número de teléfono válido';
-        }
-        
-        return '';
-      
-      case 'notas':
-        if (value && value.length > 500) {
-          return 'Las notas no pueden exceder 500 caracteres';
-        }
-        return '';
-      
-      default:
-        return '';
-    }
-  }, []);
-
-  // Validate entire form using schema validation
-  const validateForm = useCallback((): boolean => {
-    const clientData: CreateClientData = {
-      nombre: formData.nombre.trim(),
-      direccion: formData.direccion.trim(),
-      telefono: formData.telefono.trim(),
-      notas: formData.notas.trim() || undefined,
-      oculto: formData.oculto,
-    };
-
-    const validation = validateClient(clientData);
-    
-    // Also validate individual fields for field-specific errors
-    const newFieldErrors: {[key: string]: string} = {};
-    newFieldErrors.nombre = validateField('nombre', formData.nombre);
-    newFieldErrors.direccion = validateField('direccion', formData.direccion);
-    newFieldErrors.telefono = validateField('telefono', formData.telefono);
-    newFieldErrors.notas = validateField('notas', formData.notas);
-
-    setFieldErrors(newFieldErrors);
-    setErrors(validation.errors.reduce((acc, error, index) => {
-      acc[`error_${index}`] = error;
-      return acc;
-    }, {} as { [key: string]: string }));
-    
-    const hasFieldErrors = Object.values(newFieldErrors).some(error => error !== '');
-    return validation.isValid && !hasFieldErrors;
-  }, [formData, validateField]);
-
-  // Real-time field validation on blur
-  const handleFieldBlur = useCallback((fieldName: string, value: any) => {
-    setTouched(prev => ({ ...prev, [fieldName]: true }));
-    const error = validateField(fieldName, value);
-    setFieldErrors(prev => ({ ...prev, [fieldName]: error }));
-  }, [validateField]);
-
-  const handleSave = async () => {
-    const context = 'ClientForm.handleSave';
-    const isEditing = !!client;
-    
-    console.log(`${context}: Starting form submission`, { 
-      isEditing,
-      clientId: client?.id,
-      formData: {
-        nombre: formData.nombre.trim(),
-        direccion: formData.direccion.trim(),
-        telefono: formData.telefono.trim(),
-        oculto: formData.oculto,
-        hasNotas: !!formData.notas?.trim(),
-        hasFechaImportante: !!formData.fechaImportante
-      }
-    });
-
-    // Mark all fields as touched to show validation errors
-    setTouched({
-      nombre: true,
-      direccion: true,
-      telefono: true,
-      notas: true,
-    });
-
-    console.log(`${context}: Validating form`);
-    if (!validateForm()) {
-      console.error(`${context}: Form validation failed`, { 
-        fieldErrors,
-        formData: {
-          nombre: formData.nombre.trim(),
-          direccion: formData.direccion.trim(),
-          telefono: formData.telefono.trim(),
-          oculto: formData.oculto
-        }
-      });
-      
-      // Show validation errors via toast
-      showToast(
-        'Por favor corrige los errores en el formulario antes de continuar.',
-        'error'
-      );
-      return;
-    }
-    console.log(`${context}: Form validation passed`);
-
-    // Set loading state
-    setIsSubmitting(true);
-    setCanCancel(false);
-
-    try {
-      // Prepare data based on whether we're creating or updating
-      const baseData = {
-        nombre: formData.nombre.trim(),
-        direccion: formData.direccion.trim(),
-        telefono: formData.telefono.trim(),
-        oculto: formData.oculto
-      };
-
-      // Add optional fields only if they have values
-      if (formData.notas && formData.notas.trim()) {
-        baseData.notas = formData.notas.trim();
-      }
-      
-      if (formData.fechaImportante) {
-        baseData.fechaImportante = Timestamp.fromDate(formData.fechaImportante);
-      }
-
-      // For create operations, include all required fields
-      // For update operations, only include changed fields
-      const clientData: CreateClientData | UpdateClientData = client 
-        ? baseData as UpdateClientData
-        : baseData as CreateClientData;
-
-      console.log(`${context}: Calling onSave with client data`, { clientData });
-      await onSave(clientData);
-      console.log(`${context}: onSave completed successfully`);
-      
-      // Show success message
-      showToast(
-        isEditing ? 'Cliente actualizado exitosamente' : 'Cliente creado exitosamente',
-        'success'
-      );
-    } catch (error) {
-      console.error(`${context}: Form submission failed`, { 
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : error,
-        clientData: {
-          nombre: formData.nombre.trim(),
-          direccion: formData.direccion.trim(),
-          telefono: formData.telefono.trim(),
-          oculto: formData.oculto
-        }
-      });
-      
-      // Enhanced error handling with more specific messages
-      let errorMessage = 'No se pudo guardar el cliente';
-      let showRetry = true;
-      
-      if (error instanceof Error) {
-        if (error.message.includes('network')) {
-          errorMessage = 'Error de conexión. Verifica tu internet e intenta nuevamente.';
-        } else if (error.message.includes('permission')) {
-          errorMessage = 'No tienes permisos para realizar esta acción.';
-          showRetry = false;
-        } else if (error.message.includes('validation')) {
-          errorMessage = 'Los datos del cliente no son válidos.';
-          showRetry = false;
-        } else if (error.message.includes('duplicate')) {
-          errorMessage = 'Ya existe un cliente con este teléfono.';
-          showRetry = false;
-        } else if (error.message.includes('Missing or insufficient permissions')) {
-          errorMessage = 'No tienes permisos para crear clientes en esta empresa.';
-          showRetry = false;
-        } else if (error.message.includes('offline')) {
-          errorMessage = 'Sin conexión a internet. Verifica tu conexión e intenta nuevamente.';
-        }
-      }
-      
-      // Show error toast with retry action if applicable
-      showToast(
-        errorMessage,
-        'error',
-        showRetry ? {
-          label: 'Reintentar',
-          onPress: handleSave
-        } : undefined
-      );
-    } finally {
-      setIsSubmitting(false);
-      setCanCancel(true);
-    }
-  };
-
-  const updateField = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear field error when user starts typing
-    if (fieldErrors[field]) {
-      setFieldErrors(prev => ({ ...prev, [field]: '' }));
-    }
-    
-    // Clear general errors when user makes changes
-    if (Object.keys(errors).length > 0) {
-      setErrors({});
-    }
-  };
-
-  // Helper function to get input style based on validation state
-  const getInputStyle = (fieldName: string) => {
-    const hasError = touched[fieldName] && fieldErrors[fieldName];
-    return [
-      styles.input,
-      hasError ? styles.inputError : null,
-      touched[fieldName] && !fieldErrors[fieldName] && formData[fieldName as keyof typeof formData] ? styles.inputValid : null
-    ];
-  };
-
-  // Helper function to show field error
-  const renderFieldError = (fieldName: string) => {
-    if (touched[fieldName] && fieldErrors[fieldName]) {
-      return (
-        <View style={styles.fieldErrorContainer}>
-          <Ionicons name="alert-circle" size={16} color="#c62828" />
-          <Text style={styles.fieldErrorText}>{fieldErrors[fieldName]}</Text>
-        </View>
-      );
-    }
-    return null;
-  };
-
-  // Helper function to show field success
-  const renderFieldSuccess = (fieldName: string) => {
-    if (touched[fieldName] && !fieldErrors[fieldName] && formData[fieldName as keyof typeof formData]) {
-      return <Ionicons name="checkmark-circle" size={16} color="#2e7d32" style={styles.validIcon} />;
-    }
-    return null;
-  };
-
-  // Calculate if form is valid for submit button state
-  const isFormValid = !Object.values(fieldErrors).some(error => error !== '') && 
-                     formData.nombre.trim() !== '' && 
-                     formData.direccion.trim() !== '' &&
-                     formData.telefono.trim() !== '';
-
-  // Handle form cancellation
-  const handleCancel = () => {
-    if (isSubmitting && !canCancel) {
-      showToast('No se puede cancelar mientras se guarda el cliente', 'warning');
-      return;
-    }
-    onCancel();
-  };
-
-  // Format phone number as user types
-  const formatPhoneNumber = (phone: string): string => {
-    // Remove all non-numeric characters except + at the beginning
-    const cleaned = phone.replace(/[^\d+]/g, '');
-    
-    // If it starts with +, keep the +
-    if (cleaned.startsWith('+')) {
-      return '+' + cleaned.slice(1).replace(/[^\d]/g, '');
-    }
-    
-    return cleaned;
-  };
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>
-        {client ? 'Editar Cliente' : 'Nuevo Cliente'}
-      </Text>
-
-      {/* General Errors */}
-      {Object.keys(errors).length > 0 && (
-        <View style={styles.errorContainer}>
-          <View style={styles.errorHeader}>
-            <Ionicons name="warning" size={20} color="#c62828" />
-            <Text style={styles.errorHeaderText}>Errores de Validación</Text>
-          </View>
-          {Object.values(errors).map((error, index) => (
-            <Text key={index} style={styles.errorText}>• {error}</Text>
-          ))}
-        </View>
-      )}
-
-      {/* Required Fields Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="person" size={18} color="#25B4BD" /> Información Requerida
-        </Text>
-        
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>
-            Nombre *
-            {renderFieldSuccess('nombre')}
-          </Text>
-          <TextInput
-            style={getInputStyle('nombre')}
-            value={formData.nombre}
-            onChangeText={(value) => updateField('nombre', value)}
-            onBlur={() => handleFieldBlur('nombre', formData.nombre)}
-            placeholder="Nombre del cliente"
-            maxLength={100}
-            autoCapitalize="words"
-            returnKeyType="next"
-          />
-          <Text style={styles.characterCount}>{formData.nombre.length}/100</Text>
-          {renderFieldError('nombre')}
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>
-            Dirección *
-            {renderFieldSuccess('direccion')}
-          </Text>
-          <TextInput
-            style={getInputStyle('direccion')}
-            value={formData.direccion}
-            onChangeText={(value) => updateField('direccion', value)}
-            onBlur={() => handleFieldBlur('direccion', formData.direccion)}
-            placeholder="Dirección completa del cliente"
-            maxLength={200}
-            multiline
-            numberOfLines={2}
-            returnKeyType="next"
-          />
-          <Text style={styles.characterCount}>{formData.direccion.length}/200</Text>
-          {renderFieldError('direccion')}
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>
-            <Ionicons name="logo-whatsapp" size={16} color="#25D366" /> Teléfono (WhatsApp) *
-            {renderFieldSuccess('telefono')}
-          </Text>
-          <TextInput
-            style={getInputStyle('telefono')}
-            value={formData.telefono}
-            onChangeText={(value) => {
-              const formatted = formatPhoneNumber(value);
-              updateField('telefono', formatted);
-            }}
-            onBlur={() => handleFieldBlur('telefono', formData.telefono)}
-            placeholder="+1234567890 o 1234567890"
-            keyboardType="phone-pad"
-            returnKeyType="next"
-          />
-          <Text style={styles.helpText}>
-            <Ionicons name="information-circle" size={12} color="#666" /> 
-            {' '}Incluye código de país para WhatsApp internacional
-          </Text>
-          {renderFieldError('telefono')}
-        </View>
-      </View>
-
-      {/* Optional Fields Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="document-text" size={18} color="#25B4BD" /> Información Opcional
-        </Text>
-        
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>
-            Notas
-            {renderFieldSuccess('notas')}
-          </Text>
-          <TextInput
-            style={[getInputStyle('notas'), styles.textArea]}
-            value={formData.notas}
-            onChangeText={(value) => updateField('notas', value)}
-            onBlur={() => handleFieldBlur('notas', formData.notas)}
-            placeholder="Notas adicionales sobre el cliente (preferencias, historial, etc.)"
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-            returnKeyType="done"
-          />
-          <Text style={styles.characterCount}>
-            {formData.notas.length}/500 caracteres
-          </Text>
-          {renderFieldError('notas')}
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>
-            <Ionicons name="calendar" size={16} color="#25B4BD" /> Fecha Importante
-          </Text>
-          <Text style={styles.helpText}>
-            <Ionicons name="information-circle" size={12} color="#666" /> 
-            {' '}Cumpleaños, aniversario u otra fecha relevante
-          </Text>
-          <View style={styles.datePickerContainer}>
-            <DatePickerModule
-              value={formData.fechaImportante ?? new Date()}
-              onChange={(date) => {
-                try {
-                  updateField('fechaImportante', date);
-                } catch (error) {
-                  console.warn('Error updating fecha importante:', error);
-                }
-              }}
-            />
-            {formData.fechaImportante && (
-              <TouchableOpacity
-                style={styles.clearDateButton}
-                onPress={() => updateField('fechaImportante', null)}
-              >
-                <Ionicons name="close-circle" size={16} color="#fff" />
-                <Text style={styles.clearDateText}>Limpiar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Visibility Toggle (only show in edit mode) */}
-        {client && (
-          <View style={styles.fieldContainer}>
-            <View style={styles.switchContainer}>
-              <Text style={styles.label}>Cliente Oculto</Text>
-              <Switch
-                value={formData.oculto}
-                onValueChange={(value) => updateField('oculto', value)}
-                trackColor={{ false: '#767577', true: '#25B4BD' }}
-                thumbColor={formData.oculto ? '#ffffff' : '#f4f3f4'}
-              />
-            </View>
-            <Text style={styles.helpText}>
-              Los clientes ocultos no aparecen en la lista principal pero conservan su historial
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[
-            styles.button, 
-            styles.saveButton, 
-            ((isLoading || isSubmitting) || !isFormValid) && styles.buttonDisabled
-          ]}
-          onPress={handleSave}
-          disabled={(isLoading || isSubmitting) || !isFormValid}
-        >
-          {(isLoading || isSubmitting) && (
-            <Ionicons name="hourglass" size={16} color="#fff" style={styles.loadingIcon} />
-          )}
-          <Text style={styles.buttonText}>
-            {(isLoading || isSubmitting) ? 'Guardando...' : 'Guardar'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.button, 
-            styles.cancelButton,
-            (isSubmitting && !canCancel) && styles.buttonDisabled
-          ]}
-          onPress={handleCancel}
-          disabled={isSubmitting && !canCancel}
-        >
-          <Ionicons name="close" size={16} color="#fff" style={styles.buttonIcon} />
-          <Text style={[
-            styles.buttonText,
-            (isSubmitting && !canCancel) && styles.disabledText
-          ]}>
-            Cancelar
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Loading Overlay */}
-      <LoadingOverlay
-        visible={isSubmitting}
-        message={client ? 'Actualizando cliente...' : 'Creando cliente...'}
-        cancelable={canCancel}
-        onCancel={canCancel ? handleCancel : undefined}
-      />
-    </ScrollView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#333',
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#c62828',
-  },
-  errorHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  errorHeaderText: {
-    color: '#c62828',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  fieldErrorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  fieldErrorText: {
-    color: '#c62828',
-    fontSize: 12,
-    marginLeft: 4,
-    flex: 1,
-  },
-  validIcon: {
-    marginLeft: 8,
-  },
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#25B4BD',
-  },
-  fieldContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 6,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  inputError: {
-    borderColor: '#c62828',
-    backgroundColor: '#ffebee',
-  },
-  inputValid: {
-    borderColor: '#2e7d32',
-    backgroundColor: '#e8f5e8',
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  errorText: {
-    color: '#c62828',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  characterCount: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  datePickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  clearDateButton: {
-    backgroundColor: '#c62828',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  clearDateText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  helpText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-    fontStyle: 'italic',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginHorizontal: 8,
-    alignItems: 'center',
-  },
-  saveButton: {
-    backgroundColor: '#28A745',
-  },
-  cancelButton: {
-    backgroundColor: '#6c757d',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loadingIcon: {
-    marginRight: 8,
-  },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  disabledText: {
-    opacity: 0.6,
-  },
-});
+import React, { useState, useEffect, useCallback } from 'react';import {  View,  Text,  TextInput,  TouchableOpacity,  StyleSheet,  Alert,  ScrollView,  Switch} from 'react-native';import { Ionicons } from '@expo/vector-icons';import { Timestamp } from 'firebase/firestore';import DatePickerModule from '@/components/DatePicker';import { Client, CreateClientData, UpdateClientData } from '@/schemas/types';import { validateClient } from '@/schemas/validation';import { useToast } from '@/context/ToastProvider';import LoadingOverlay from '@/components/ui/LoadingOverlay';interface ClientFormProps {  client?: Client;  onSave: (clientData: CreateClientData | UpdateClientData) => Promise<void>;  onCancel: () => void;  isLoading?: boolean;}export default function ClientForm({ client, onSave, onCancel, isLoading = false }: ClientFormProps) {  const [formData, setFormData] = useState({    nombre: '',    direccion: '',    telefono: '',    notas: '',    fechaImportante: null as Date | null,    oculto: false  });  const [errors, setErrors] = useState<{ [key: string]: string }>({});  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});  const [isSubmitting, setIsSubmitting] = useState(false);  const [canCancel, setCanCancel] = useState(true);  const { showToast } = useToast();  useEffect(() => {    if (client) {      setFormData({        nombre: client.nombre,        direccion: client.direccion,        telefono: client.telefono,        notas: client.notas || '',        fechaImportante: client.fechaImportante ? client.fechaImportante.toDate() : null,        oculto: client.oculto      });    }    setErrors({});    setFieldErrors({});    setTouched({});    setIsSubmitting(false);    setCanCancel(true);  }, [client]);  const validateField = useCallback((fieldName: string, value: any): string => {    switch (fieldName) {      case 'nombre':        if (!value || !value.trim()) {          return 'El nombre del cliente es requerido';        }        if (value.trim().length < 2) {          return 'El nombre debe tener al menos 2 caracteres';        }        if (value.trim().length > 100) {          return 'El nombre no puede exceder 100 caracteres';        }        return '';      case 'direccion':        if (!value || !value.trim()) {          return 'La dirección es requerida';        }        if (value.trim().length < 5) {          return 'La dirección debe tener al menos 5 caracteres';        }        if (value.trim().length > 200) {          return 'La dirección no puede exceder 200 caracteres';        }        return '';      case 'telefono':        if (!value || !value.trim()) {          return 'El teléfono es requerido';        }        const phoneRegex = /^[\d\s\+\-\(\)]+$/;        const cleanPhone = value.replace(/\D/g, '');        if (!phoneRegex.test(value)) {          return 'El teléfono solo puede contener números, espacios, +, -, (, )';        }        if (cleanPhone.length < 7) {          return 'El teléfono debe tener al menos 7 dígitos';        }        if (cleanPhone.length > 15) {          return 'El teléfono no puede tener más de 15 dígitos';        }        if (/^0+$/.test(cleanPhone) || /^1+$/.test(cleanPhone)) {          return 'Ingrese un número de teléfono válido';        }        return '';      case 'notas':        if (value && value.length > 500) {          return 'Las notas no pueden exceder 500 caracteres';        }        return '';      default:        return '';    }  }, []);  const validateForm = useCallback((): boolean => {    const clientData: CreateClientData = {      nombre: formData.nombre.trim(),      direccion: formData.direccion.trim(),      telefono: formData.telefono.trim(),      notas: formData.notas.trim() || undefined,      oculto: formData.oculto,    };    const validation = validateClient(clientData);    const newFieldErrors: { [key: string]: string } = {};    newFieldErrors.nombre = validateField('nombre', formData.nombre);    newFieldErrors.direccion = validateField('direccion', formData.direccion);    newFieldErrors.telefono = validateField('telefono', formData.telefono);    newFieldErrors.notas = validateField('notas', formData.notas);    setFieldErrors(newFieldErrors);    setErrors(validation.errors.reduce((acc, error, index) => {      acc[`error_${index}`] = error;      return acc;    }, {} as { [key: string]: string }));    const hasFieldErrors = Object.values(newFieldErrors).some(error => error !== '');    return validation.isValid && !hasFieldErrors;  }, [formData, validateField]);  const handleFieldBlur = useCallback((fieldName: string, value: any) => {    setTouched(prev => ({ ...prev, [fieldName]: true }));    const error = validateField(fieldName, value);    setFieldErrors(prev => ({ ...prev, [fieldName]: error }));  }, [validateField]);  const handleSave = async () => {    const context = 'ClientForm.handleSave';    const isEditing = !!client;    setTouched({      nombre: true,      direccion: true,      telefono: true,      notas: true,    });    if (!validateForm()) {      console.error(`${context}: Form validation failed`, {        fieldErrors,        formData: {          nombre: formData.nombre.trim(),          direccion: formData.direccion.trim(),          telefono: formData.telefono.trim(),          oculto: formData.oculto        }      });      showToast(        'Por favor corrige los errores en el formulario antes de continuar.',        'error'      );      return;    }    setIsSubmitting(true);    setCanCancel(false);    try {      const baseData: any = {        nombre: formData.nombre.trim(),        direccion: formData.direccion.trim(),        telefono: formData.telefono.trim(),        oculto: formData.oculto      };      if (formData.notas && formData.notas.trim()) {        baseData.notas = formData.notas.trim();      }      if (formData.fechaImportante) {        baseData.fechaImportante = Timestamp.fromDate(formData.fechaImportante);      }      const clientData: CreateClientData | UpdateClientData = client        ? baseData as UpdateClientData        : baseData as CreateClientData;      await onSave(clientData);      showToast(        isEditing ? 'Cliente actualizado exitosamente' : 'Cliente creado exitosamente',        'success'      );    } catch (error) {      console.error(`${context}: Form submission failed`, {        error: error instanceof Error ? {          name: error.name,          message: error.message,          stack: error.stack        } : error,        clientData: {          nombre: formData.nombre.trim(),          direccion: formData.direccion.trim(),          telefono: formData.telefono.trim(),          oculto: formData.oculto        }      });      let errorMessage = 'No se pudo guardar el cliente';      let showRetry = true;      if (error instanceof Error) {        if (error.message.includes('network')) {          errorMessage = 'Error de conexión. Verifica tu internet e intenta nuevamente.';        } else if (error.message.includes('permission')) {          errorMessage = 'No tienes permisos para realizar esta acción.';          showRetry = false;        } else if (error.message.includes('validation')) {          errorMessage = 'Los datos del cliente no son válidos.';          showRetry = false;        } else if (error.message.includes('duplicate')) {          errorMessage = 'Ya existe un cliente con este teléfono.';          showRetry = false;        } else if (error.message.includes('Missing or insufficient permissions')) {          errorMessage = 'No tienes permisos para crear clientes en esta empresa.';          showRetry = false;        } else if (error.message.includes('offline')) {          errorMessage = 'Sin conexión a internet. Verifica tu conexión e intenta nuevamente.';        }      }      showToast(        errorMessage,        'error',        showRetry ? {          label: 'Reintentar',          onPress: handleSave        } : undefined      );    } finally {      setIsSubmitting(false);      setCanCancel(true);    }  };  const updateField = (field: string, value: any) => {    setFormData(prev => ({ ...prev, [field]: value }));    if (fieldErrors[field]) {      setFieldErrors(prev => ({ ...prev, [field]: '' }));    }    if (Object.keys(errors).length > 0) {      setErrors({});    }  };  const getInputStyle = (fieldName: string) => {    const hasError = touched[fieldName] && fieldErrors[fieldName];    return [      styles.input,      hasError ? styles.inputError : null,      touched[fieldName] && !fieldErrors[fieldName] && formData[fieldName as keyof typeof formData] ? styles.inputValid : null    ];  };  const renderFieldError = (fieldName: string) => {    if (touched[fieldName] && fieldErrors[fieldName]) {      return (        <View style={styles.fieldErrorContainer}>          <Ionicons name="alert-circle" size={16} color="#c62828" />          <Text style={styles.fieldErrorText}>{fieldErrors[fieldName]}</Text>        </View>      );    }    return null;  };  const renderFieldSuccess = (fieldName: string) => {    if (touched[fieldName] && !fieldErrors[fieldName] && formData[fieldName as keyof typeof formData]) {      return <Ionicons name="checkmark-circle" size={16} color="#2e7d32" style={styles.validIcon} />;    }    return null;  };  const isFormValid = !Object.values(fieldErrors).some(error => error !== '') &&    formData.nombre.trim() !== '' &&    formData.direccion.trim() !== '' &&    formData.telefono.trim() !== '';  const handleCancel = () => {    if (isSubmitting && !canCancel) {      showToast('No se puede cancelar mientras se guarda el cliente', 'warning');      return;    }    onCancel();  };  const formatPhoneNumber = (phone: string): string => {    const cleaned = phone.replace(/[^\d+]/g, '');    if (cleaned.startsWith('+')) {      return '+' + cleaned.slice(1).replace(/[^\d]/g, '');    }    return cleaned;  };  return (    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>      <Text style={styles.title}>        {client ? 'Editar Cliente' : 'Nuevo Cliente'}      </Text>      {}      {Object.keys(errors).length > 0 && (        <View style={styles.errorContainer}>          <View style={styles.errorHeader}>            <Ionicons name="warning" size={20} color="#c62828" />            <Text style={styles.errorHeaderText}>Errores de Validación</Text>          </View>          {Object.values(errors).map((error, index) => (            <Text key={index} style={styles.errorText}>• {error}</Text>          ))}        </View>      )}      {}      <View style={styles.section}>        <Text style={styles.sectionTitle}>          <Ionicons name="person" size={18} color="#25B4BD" /> Información Requerida        </Text>        <View style={styles.fieldContainer}>          <Text style={styles.label}>            Nombre *            {renderFieldSuccess('nombre')}          </Text>          <TextInput            style={getInputStyle('nombre')}            value={formData.nombre}            onChangeText={(value) => updateField('nombre', value)}            onBlur={() => handleFieldBlur('nombre', formData.nombre)}            placeholder="Nombre del cliente"            maxLength={100}            autoCapitalize="words"            returnKeyType="next"          />          <Text style={styles.characterCount}>{formData.nombre.length}/100</Text>          {renderFieldError('nombre')}        </View>        <View style={styles.fieldContainer}>          <Text style={styles.label}>            Dirección *            {renderFieldSuccess('direccion')}          </Text>          <TextInput            style={getInputStyle('direccion')}            value={formData.direccion}            onChangeText={(value) => updateField('direccion', value)}            onBlur={() => handleFieldBlur('direccion', formData.direccion)}            placeholder="Dirección completa del cliente"            maxLength={200}            multiline            numberOfLines={2}            returnKeyType="next"          />          <Text style={styles.characterCount}>{formData.direccion.length}/200</Text>          {renderFieldError('direccion')}        </View>        <View style={styles.fieldContainer}>          <Text style={styles.label}>            <Ionicons name="logo-whatsapp" size={16} color="#25D366" /> Teléfono (WhatsApp) *            {renderFieldSuccess('telefono')}          </Text>          <TextInput            style={getInputStyle('telefono')}            value={formData.telefono}            onChangeText={(value) => {              const formatted = formatPhoneNumber(value);              updateField('telefono', formatted);            }}            onBlur={() => handleFieldBlur('telefono', formData.telefono)}            placeholder="+1234567890 o 1234567890"            keyboardType="phone-pad"            returnKeyType="next"          />          <Text style={styles.helpText}>            <Ionicons name="information-circle" size={12} color="#666" />            {' '}Incluye código de país para WhatsApp internacional          </Text>          {renderFieldError('telefono')}        </View>      </View>      {}      <View style={styles.section}>        <Text style={styles.sectionTitle}>          <Ionicons name="document-text" size={18} color="#25B4BD" /> Información Opcional        </Text>        <View style={styles.fieldContainer}>          <Text style={styles.label}>            Notas            {renderFieldSuccess('notas')}          </Text>          <TextInput            style={[getInputStyle('notas'), styles.textArea]}            value={formData.notas}            onChangeText={(value) => updateField('notas', value)}            onBlur={() => handleFieldBlur('notas', formData.notas)}            placeholder="Notas adicionales sobre el cliente (preferencias, historial, etc.)"            multiline            numberOfLines={3}            maxLength={500}            returnKeyType="done"          />          <Text style={styles.characterCount}>            {formData.notas.length}/500 caracteres          </Text>          {renderFieldError('notas')}        </View>        <View style={styles.fieldContainer}>          <Text style={styles.label}>            <Ionicons name="calendar" size={16} color="#25B4BD" /> Fecha Importante          </Text>          <Text style={styles.helpText}>            <Ionicons name="information-circle" size={12} color="#666" />            {' '}Cumpleaños, aniversario u otra fecha relevante          </Text>          <View style={styles.datePickerContainer}>            <DatePickerModule              value={formData.fechaImportante ?? new Date()}              onChange={(date) => {                try {                  updateField('fechaImportante', date);                } catch (error) {                  console.warn('Error updating fecha importante:', error);                }              }}            />            {formData.fechaImportante && (              <TouchableOpacity                style={styles.clearDateButton}                onPress={() => updateField('fechaImportante', null)}              >                <Ionicons name="close-circle" size={16} color="#fff" />                <Text style={styles.clearDateText}>Limpiar</Text>              </TouchableOpacity>            )}          </View>        </View>        {}        {client && (          <View style={styles.fieldContainer}>            <View style={styles.switchContainer}>              <Text style={styles.label}>Cliente Oculto</Text>              <Switch                value={formData.oculto}                onValueChange={(value) => updateField('oculto', value)}                trackColor={{ false: '#767577', true: '#25B4BD' }}                thumbColor={formData.oculto ? '#ffffff' : '#f4f3f4'}              />            </View>            <Text style={styles.helpText}>              Los clientes ocultos no aparecen en la lista principal pero conservan su historial            </Text>          </View>        )}      </View>      {}      <View style={styles.buttonContainer}>        <TouchableOpacity          style={[            styles.button,            styles.saveButton,            ((isLoading || isSubmitting) || !isFormValid) && styles.buttonDisabled          ]}          onPress={handleSave}          disabled={(isLoading || isSubmitting) || !isFormValid}        >          {(isLoading || isSubmitting) && (            <Ionicons name="hourglass" size={16} color="#fff" style={styles.loadingIcon} />          )}          <Text style={styles.buttonText}>            {(isLoading || isSubmitting) ? 'Guardando...' : 'Guardar'}          </Text>        </TouchableOpacity>        <TouchableOpacity          style={[            styles.button,            styles.cancelButton,            (isSubmitting && !canCancel) && styles.buttonDisabled          ]}          onPress={handleCancel}          disabled={isSubmitting && !canCancel}        >          <Ionicons name="close" size={16} color="#fff" style={styles.buttonIcon} />          <Text style={[            styles.buttonText,            (isSubmitting && !canCancel) && styles.disabledText          ]}>            Cancelar          </Text>        </TouchableOpacity>      </View>      {}      <LoadingOverlay        visible={isSubmitting}        message={client ? 'Actualizando cliente...' : 'Creando cliente...'}        cancelable={canCancel}        onCancel={canCancel ? handleCancel : undefined}      />    </ScrollView>  );}const styles = StyleSheet.create({  container: {    flex: 1,    backgroundColor: '#f5f5f5',  },  contentContainer: {    padding: 20,    paddingBottom: 40,  },  title: {    fontSize: 24,    fontWeight: 'bold',    textAlign: 'center',    marginBottom: 20,    color: '#333',  },  errorContainer: {    backgroundColor: '#ffebee',    padding: 12,    borderRadius: 8,    marginBottom: 16,    borderLeftWidth: 4,    borderLeftColor: '#c62828',  },  errorHeader: {    flexDirection: 'row',    alignItems: 'center',    marginBottom: 8,  },  errorHeaderText: {    color: '#c62828',    fontSize: 16,    fontWeight: '600',    marginLeft: 8,  },  fieldErrorContainer: {    flexDirection: 'row',    alignItems: 'center',    marginTop: 4,  },  fieldErrorText: {    color: '#c62828',    fontSize: 12,    marginLeft: 4,    flex: 1,  },  validIcon: {    marginLeft: 8,  },  section: {    backgroundColor: '#fff',    borderRadius: 10,    padding: 16,    marginBottom: 16,    elevation: 2,    shadowColor: '#000',    shadowOffset: { width: 0, height: 2 },    shadowOpacity: 0.1,    shadowRadius: 4,  },  sectionTitle: {    fontSize: 18,    fontWeight: 'bold',    marginBottom: 12,    color: '#25B4BD',  },  fieldContainer: {    marginBottom: 16,  },  label: {    fontSize: 16,    fontWeight: '600',    marginBottom: 6,    color: '#333',  },  input: {    borderWidth: 1,    borderColor: '#ddd',    borderRadius: 8,    padding: 12,    fontSize: 16,    backgroundColor: '#fff',  },  inputError: {    borderColor: '#c62828',    backgroundColor: '#ffebee',  },  inputValid: {    borderColor: '#2e7d32',    backgroundColor: '#e8f5e8',  },  textArea: {    minHeight: 80,    textAlignVertical: 'top',  },  errorText: {    color: '#c62828',    fontSize: 14,    lineHeight: 20,  },  characterCount: {    fontSize: 12,    color: '#666',    textAlign: 'right',    marginTop: 4,  },  datePickerContainer: {    flexDirection: 'row',    alignItems: 'center',    justifyContent: 'space-between',  },  clearDateButton: {    backgroundColor: '#c62828',    paddingHorizontal: 12,    paddingVertical: 6,    borderRadius: 6,    flexDirection: 'row',    alignItems: 'center',  },  clearDateText: {    color: '#fff',    fontSize: 14,    fontWeight: '600',    marginLeft: 4,  },  switchContainer: {    flexDirection: 'row',    alignItems: 'center',    justifyContent: 'space-between',  },  helpText: {    fontSize: 12,    color: '#666',    marginTop: 4,    fontStyle: 'italic',    flexDirection: 'row',    alignItems: 'center',  },  buttonContainer: {    flexDirection: 'row',    justifyContent: 'space-around',    marginTop: 20,  },  button: {    flex: 1,    paddingVertical: 14,    paddingHorizontal: 20,    borderRadius: 8,    marginHorizontal: 8,    alignItems: 'center',  },  saveButton: {    backgroundColor: '#28A745',  },  cancelButton: {    backgroundColor: '#6c757d',  },  buttonDisabled: {    opacity: 0.6,  },  buttonText: {    color: '#fff',    fontSize: 16,    fontWeight: 'bold',  },  loadingIcon: {    marginRight: 8,  },  buttonIcon: {    marginRight: 8,  },  disabledText: {    opacity: 0.6,  },});

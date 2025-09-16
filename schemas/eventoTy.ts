@@ -1,5 +1,4 @@
 import { Timestamp } from "firebase/firestore";
-
 type EventoBase = {
     id: string;
     borrado: boolean;
@@ -9,7 +8,6 @@ type EventoBase = {
     creado: Timestamp;
     actualizado: Timestamp;
   };
-  
   type EventoVenta = EventoBase & {
     tipo: "bajar";
     cantidad: number | null;
@@ -18,11 +16,8 @@ type EventoBase = {
     productoColor?: string;
     ganancia?: number | null;
   };
-  
   type EventoCobrar = EventoBase & {
     tipo: "entrego";
     monto: number | null;
-  
   };
-  
   export type EventoTy = EventoVenta | EventoCobrar;

@@ -1,4 +1,3 @@
-// Types and interfaces for diagnostic system
 export interface DiagnosticReport {
   timestamp: Date;
   error?: Error;

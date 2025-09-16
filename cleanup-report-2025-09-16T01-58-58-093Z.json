@@ -1,0 +1,47 @@
+{
+  "timestamp": "2025-09-16T01:58:58.059Z",
+  "steps": [
+    {
+      "name": "Setup Analysis Tools",
+      "status": "started",
+      "timestamp": "2025-09-16T01:58:58.090Z",
+      "details": null
+    },
+    {
+      "name": "Setup Analysis Tools",
+      "status": "failed",
+      "timestamp": "2025-09-16T01:58:58.093Z",
+      "details": {
+        "message": "Expected double-quoted property name in JSON at position 110",
+        "stack": "SyntaxError: Expected double-quoted property name in JSON at position 110\n    at JSON.parse (<anonymous>)\n    at CleanupOrchestrator.setupAnalysisTools (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:234:23)\n    at C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:511:65\n    at CleanupOrchestrator.executeStep (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:160:28)\n    at CleanupOrchestrator.orchestrate (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:511:18)\n    at main (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:639:39)\n    at Object.<anonymous> (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:659:3)\n    at Module._compile (node:internal/modules/cjs/loader:1529:14)\n    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)\n    at Module.load (node:internal/modules/cjs/loader:1275:32)"
+      }
+    }
+  ],
+  "summary": {
+    "totalSteps": 1,
+    "completedSteps": 0,
+    "failedSteps": 1,
+    "skippedSteps": 0,
+    "successRate": "0.00%",
+    "duration": "2025-09-16T01:58:58.093Z"
+  },
+  "errors": [
+    {
+      "step": "Setup Analysis Tools",
+      "error": {
+        "message": "Expected double-quoted property name in JSON at position 110",
+        "stack": "SyntaxError: Expected double-quoted property name in JSON at position 110\n    at JSON.parse (<anonymous>)\n    at CleanupOrchestrator.setupAnalysisTools (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:234:23)\n    at C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:511:65\n    at CleanupOrchestrator.executeStep (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:160:28)\n    at CleanupOrchestrator.orchestrate (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:511:18)\n    at main (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:639:39)\n    at Object.<anonymous> (C:\\Programacion\\2025\\cuenta_microempresas\\scripts\\cleanup-orchestrator.js:659:3)\n    at Module._compile (node:internal/modules/cjs/loader:1529:14)\n    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)\n    at Module.load (node:internal/modules/cjs/loader:1275:32)"
+      },
+      "required": true
+    }
+  ],
+  "warnings": [],
+  "options": {
+    "dryRun": true,
+    "verbose": false,
+    "skipSteps": [],
+    "logFile": "cleanup-orchestrator.log",
+    "useBackup": true,
+    "noGit": false
+  }
+}

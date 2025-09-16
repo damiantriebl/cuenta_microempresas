@@ -1,25 +1,21 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
-
 interface AppLogoProps {
   size?: 'small' | 'medium' | 'large';
   showText?: boolean;
   style?: any;
 }
-
 export default function AppLogo({ size = 'medium', showText = true, style }: AppLogoProps) {
   const sizeStyles = {
     small: { width: 32, height: 32 },
     medium: { width: 48, height: 48 },
     large: { width: 80, height: 80 },
   };
-
   const textSizes = {
     small: 14,
     medium: 18,
     large: 24,
   };
-
   return (
     <View style={[styles.container, style]}>
       <Image 
@@ -35,7 +31,6 @@ export default function AppLogo({ size = 'medium', showText = true, style }: App
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',

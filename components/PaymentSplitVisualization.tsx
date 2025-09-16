@@ -1,225 +1,1 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { TransactionEventWithRunningTotal } from '@/schemas/business-logic';
-import { formatCurrency, formatDate } from '@/schemas/business-logic';
-import { FontAwesome } from '@expo/vector-icons';
-import ZeroBalanceSeparator from './ZeroBalanceSeparator';
-import FavorBalanceDisplay from './FavorBalanceDisplay';
-
-interface PaymentSplitVisualizationProps {
-  event: TransactionEventWithRunningTotal;
-  debtPortion: number;
-  favorPortion: number;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  onViewNotes?: () => void;
-}
-
-const PaymentSplitVisualization: React.FC<PaymentSplitVisualizationProps> = ({
-  event,
-  debtPortion,
-  favorPortion,
-  onEdit,
-  onDelete,
-  onViewNotes,
-}) => {
-  return (
-    <View style={styles.container}>
-      {/* Debt payment portion */}
-      {debtPortion > 0 && (
-        <View style={styles.debtPaymentCard}>
-          <LinearGradient
-            colors={['#279D2E', '#1e7e25']}
-            style={styles.paymentGradient}
-          >
-            <View style={styles.cardContent}>
-              <View style={styles.leftContent}>
-                <Text style={styles.paymentLabel}>Pago aplicado a deuda</Text>
-                <Text style={styles.paymentAmount}>
-                  {formatCurrency(debtPortion)}
-                </Text>
-                <Text style={styles.dateText}>
-                  {formatDate(event.fecha)}
-                </Text>
-              </View>
-              
-              <View style={styles.rightContent}>
-                <Text style={styles.runningTotal}>
-                  {formatCurrency(0)}
-                </Text>
-                <Text style={styles.zeroLabel}>saldado</Text>
-                
-                {/* Notes indicator */}
-                {event.notas && event.notas.trim().length > 0 && (
-                  <TouchableOpacity 
-                    style={styles.notesIndicator}
-                    onPress={onViewNotes}
-                  >
-                    <FontAwesome 
-                      name="sticky-note" 
-                      size={16} 
-                      color="#fff" 
-                      style={{ opacity: 0.8 }}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            
-            {/* Action buttons for debt portion */}
-            {onEdit && (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.editButton]} 
-                  onPress={onEdit}
-                >
-                  <FontAwesome name="edit" size={16} color="#fff" />
-                  <Text style={styles.actionButtonText}>Editar</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </LinearGradient>
-        </View>
-      )}
-      
-      {/* Zero balance separator */}
-      <ZeroBalanceSeparator message="cuenta en 0" />
-      
-      {/* Favor balance portion */}
-      {favorPortion > 0 && (
-        <FavorBalanceDisplay 
-          amount={favorPortion} 
-          message="saldo a favor"
-        />
-      )}
-      
-      {/* Connection indicator */}
-      <View style={styles.connectionIndicator}>
-        <View style={styles.connectionLine} />
-        <View style={styles.connectionDot} />
-        <Text style={styles.connectionText}>
-          Pago dividido: {formatCurrency(debtPortion + favorPortion)}
-        </Text>
-      </View>
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  debtPaymentCard: {
-    marginBottom: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  paymentGradient: {
-    padding: 16,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  leftContent: {
-    flex: 1,
-    marginRight: 16,
-  },
-  rightContent: {
-    alignItems: 'flex-end',
-  },
-  paymentLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  paymentAmount: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#fff',
-    opacity: 0.8,
-  },
-  runningTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  zeroLabel: {
-    fontSize: 12,
-    color: '#fff',
-    fontStyle: 'italic',
-    opacity: 0.9,
-    marginTop: 2,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    marginLeft: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  actionButtonText: {
-    marginLeft: 4,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  editButton: {
-    // Additional styling for edit button if needed
-  },
-  notesIndicator: {
-    marginTop: 8,
-    padding: 4,
-  },
-  connectionIndicator: {
-    alignItems: 'center',
-    marginTop: 8,
-    position: 'relative',
-  },
-  connectionLine: {
-    width: 2,
-    height: 20,
-    backgroundColor: '#ddd',
-    marginBottom: 4,
-  },
-  connectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#25B4BD',
-    marginBottom: 4,
-  },
-  connectionText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-});
-
-export default PaymentSplitVisualization;
+import React from 'react';import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';import { LinearGradient } from 'expo-linear-gradient';import { TransactionEventWithRunningTotal } from '@/schemas/business-logic';import { formatCurrency, formatDate } from '@/schemas/business-logic';import { FontAwesome } from '@expo/vector-icons';import ZeroBalanceSeparator from './ZeroBalanceSeparator';import FavorBalanceDisplay from './FavorBalanceDisplay';interface PaymentSplitVisualizationProps {  event: TransactionEventWithRunningTotal;  debtPortion: number;  favorPortion: number;  onEdit?: () => void;  onDelete?: () => void;  onViewNotes?: () => void;}const PaymentSplitVisualization: React.FC<PaymentSplitVisualizationProps> = ({  event,  debtPortion,  favorPortion,  onEdit,  onDelete,  onViewNotes,}) => {  return (    <View style={styles.container}>      {}      {debtPortion > 0 && (        <View style={styles.debtPaymentCard}>          <LinearGradient            colors={['#279D2E', '#1e7e25']}            style={styles.paymentGradient}          >            <View style={styles.cardContent}>              <View style={styles.leftContent}>                <Text style={styles.paymentLabel}>Pago aplicado a deuda</Text>                <Text style={styles.paymentAmount}>                  {formatCurrency(debtPortion)}                </Text>                <Text style={styles.dateText}>                  {formatDate(event.fecha)}                </Text>              </View>              <View style={styles.rightContent}>                <Text style={styles.runningTotal}>                  {formatCurrency(0)}                </Text>                <Text style={styles.zeroLabel}>saldado</Text>                {}                {event.notas && event.notas.trim().length > 0 && (                  <TouchableOpacity                     style={styles.notesIndicator}                    onPress={onViewNotes}                  >                    <FontAwesome                       name="sticky-note"                       size={16}                       color="#fff"                       style={{ opacity: 0.8 }}                    />                  </TouchableOpacity>                )}              </View>            </View>            {}            {onEdit && (              <View style={styles.actionButtons}>                <TouchableOpacity                   style={[styles.actionButton, styles.editButton]}                   onPress={onEdit}                >                  <FontAwesome name="edit" size={16} color="#fff" />                  <Text style={styles.actionButtonText}>Editar</Text>                </TouchableOpacity>              </View>            )}          </LinearGradient>        </View>      )}      {}      <ZeroBalanceSeparator message="cuenta en 0" />      {}      {favorPortion > 0 && (        <FavorBalanceDisplay           amount={favorPortion}           message="saldo a favor"        />      )}      {}      <View style={styles.connectionIndicator}>        <View style={styles.connectionLine} />        <View style={styles.connectionDot} />        <Text style={styles.connectionText}>          Pago dividido: {formatCurrency(debtPortion + favorPortion)}        </Text>      </View>    </View>  );};const styles = StyleSheet.create({  container: {    marginBottom: 16,  },  debtPaymentCard: {    marginBottom: 8,    borderRadius: 12,    overflow: 'hidden',    shadowColor: '#000',    shadowOffset: {      width: 0,      height: 3,    },    shadowOpacity: 0.15,    shadowRadius: 6,    elevation: 4,  },  paymentGradient: {    padding: 16,  },  cardContent: {    flexDirection: 'row',    justifyContent: 'space-between',    alignItems: 'flex-start',  },  leftContent: {    flex: 1,    marginRight: 16,  },  rightContent: {    alignItems: 'flex-end',  },  paymentLabel: {    fontSize: 16,    fontWeight: 'bold',    color: '#fff',    marginBottom: 4,  },  paymentAmount: {    fontSize: 18,    fontWeight: '600',    color: '#fff',    marginBottom: 8,  },  dateText: {    fontSize: 12,    color: '#fff',    opacity: 0.8,  },  runningTotal: {    fontSize: 18,    fontWeight: 'bold',    color: '#fff',  },  zeroLabel: {    fontSize: 12,    color: '#fff',    fontStyle: 'italic',    opacity: 0.9,    marginTop: 2,  },  actionButtons: {    flexDirection: 'row',    justifyContent: 'flex-end',    marginTop: 12,    paddingTop: 12,    borderTopWidth: 1,    borderTopColor: 'rgba(255, 255, 255, 0.2)',  },  actionButton: {    flexDirection: 'row',    alignItems: 'center',    padding: 8,    paddingHorizontal: 12,    borderRadius: 6,    marginLeft: 8,    backgroundColor: 'rgba(255, 255, 255, 0.2)',  },  actionButtonText: {    marginLeft: 4,    fontSize: 14,    fontWeight: '600',    color: '#fff',  },  editButton: {  },  notesIndicator: {    marginTop: 8,    padding: 4,  },  connectionIndicator: {    alignItems: 'center',    marginTop: 8,    position: 'relative',  },  connectionLine: {    width: 2,    height: 20,    backgroundColor: '#ddd',    marginBottom: 4,  },  connectionDot: {    width: 8,    height: 8,    borderRadius: 4,    backgroundColor: '#25B4BD',    marginBottom: 4,  },  connectionText: {    fontSize: 12,    color: '#666',    fontStyle: 'italic',  },});export default PaymentSplitVisualization;

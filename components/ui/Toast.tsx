@@ -8,9 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
-
 export interface ToastProps {
   visible: boolean;
   message: string;
@@ -22,9 +20,7 @@ export interface ToastProps {
     onPress: () => void;
   };
 }
-
 const { width } = Dimensions.get('window');
-
 export default function Toast({
   visible,
   message,
@@ -35,16 +31,12 @@ export default function Toast({
 }: ToastProps) {
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const timeoutRef = useRef<NodeJS.Timeout>();
-
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   useEffect(() => {
     if (visible) {
-      // Clear any existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-
-      // Show animation
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 0,
@@ -57,22 +49,18 @@ export default function Toast({
           useNativeDriver: true,
         }),
       ]).start();
-
-      // Auto hide after duration
       timeoutRef.current = setTimeout(() => {
         hideToast();
       }, duration);
     } else {
       hideToast();
     }
-
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
     };
   }, [visible, duration]);
-
   const hideToast = () => {
     Animated.parallel([
       Animated.timing(translateY, {
@@ -89,7 +77,6 @@ export default function Toast({
       onHide();
     });
   };
-
   const getToastStyle = () => {
     switch (type) {
       case 'success':
@@ -119,13 +106,10 @@ export default function Toast({
         };
     }
   };
-
   const toastStyle = getToastStyle();
-
   if (!visible) {
     return null;
   }
-
   return (
     <Animated.View
       style={[
@@ -165,7 +149,6 @@ export default function Toast({
     </Animated.View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',

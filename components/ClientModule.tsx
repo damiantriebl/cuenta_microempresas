@@ -8,17 +8,15 @@ import { timestampToDate } from '@/hooks/timestampToDate';
 import { useClientSelection } from '@/context/ClientSelectionProvider';
 import { Client } from '@/schemas/types';
 import { useTheme } from '@/context/ThemeProvider';
-import { ThemedCard } from '@/components/ui';
+import { ThemedView } from '@/components/ThemedView';
 import { SimpleDebtService } from '@/services/SimpleDebtService';
 import { useAuth } from '@/context/AuthProvider';
-
 interface ClientModuleProps {
     client: Client;
     onToggleVisibility?: (clientId: string) => void;
     onEdit?: (client: Client) => void;
     showActions?: boolean;
 }
-
 const ClientModule = ({
     client,
     onToggleVisibility,
@@ -29,10 +27,7 @@ const ClientModule = ({
     const { colors, spacing, typography, shadows } = useTheme();
     const { empresaId } = useAuth();
     const [simpleDebt, setSimpleDebt] = useState<number>(0);
-
     const isSelected = selectedClient?.id === client.id;
-
-    // Load simple debt from AsyncStorage
     useEffect(() => {
         const loadSimpleDebt = async () => {
             if (empresaId) {
@@ -41,21 +36,13 @@ const ClientModule = ({
             }
         };
         loadSimpleDebt();
-
-        // Set up interval to refresh debt periodically (every 2 seconds)
         const interval = setInterval(loadSimpleDebt, 2000);
-
         return () => clearInterval(interval);
     }, [empresaId, client.id]);
-
     const handlePress = () => {
-        // Select the client in the global context
         selectClient(client);
-
-        // Navigate to the history tab
         router.push('/(tabs)/history');
     };
-
     const handleToggleVisibility = (e: any) => {
         e.stopPropagation();
         if (onToggleVisibility) {
@@ -73,47 +60,38 @@ const ClientModule = ({
             );
         }
     };
-
     const handleEdit = (e: any) => {
         e.stopPropagation();
         if (onEdit) {
             onEdit(client);
         }
     };
-
     const formatDebt = (debt: number) => {
-        // Handle NaN, undefined, or null values
         if (debt == null || isNaN(debt)) {
             return 'Sin deuda';
         }
-
         if (debt === 0) return 'Sin deuda';
         if (debt > 0) return `Debe $${debt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         return `A favor $${Math.abs(debt).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
-
     const getDebtColor = (debt: number) => {
-        // Handle NaN, undefined, or null values - treat as no debt
         if (debt == null || isNaN(debt) || debt === 0) {
-            return colors.success; // Green for no debt
+            return colors.success;
         }
-        if (debt > 0) return colors.error; // Red for debt
-        return colors.info; // Blue for credit
+        if (debt > 0) return colors.error;
+        return colors.info;
     };
-
     const formatLastTransaction = (timestamp?: Timestamp) => {
         if (!timestamp) return 'Sin transacciones';
         const date = timestampToDate(timestamp);
         const now = new Date();
         const diffTime = Math.abs(now.getTime() - date.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
         if (diffDays === 1) return 'Hace 1 día';
         if (diffDays < 7) return `Hace ${diffDays} días`;
         if (diffDays < 30) return `Hace ${Math.ceil(diffDays / 7)} semanas`;
         return date.toLocaleDateString();
     };
-
     return (
         <TouchableOpacity
             style={[
@@ -166,7 +144,6 @@ const ClientModule = ({
                         {formatDebt(simpleDebt)}
                     </Text>
                 </View>
-
                 {showActions && (
                     <View style={[styles.actionButtons, { gap: spacing.xs }]}>
                         <TouchableOpacity
@@ -202,9 +179,7 @@ const ClientModule = ({
                     </View>
                 )}
             </View>
-
             <ThemedText type="subtitle" style={[
-                styles.address,
                 {
                     fontSize: typography.fontSize.sm,
                     color: colors.textSecondary,
@@ -214,10 +189,8 @@ const ClientModule = ({
             ]}>
                 {client.direccion}
             </ThemedText>
-
             <View style={styles.cardFooter}>
                 <Text style={[
-                    styles.lastTransaction,
                     {
                         fontSize: typography.fontSize.xs,
                         color: colors.textLight,
@@ -228,10 +201,9 @@ const ClientModule = ({
                 </Text>
                 {client.telefono && (
                     <TouchableOpacity
-                        style={[styles.whatsappButton, { padding: spacing.xs }]}
+                        style={[{ padding: spacing.xs }]}
                         onPress={(e) => {
                             e.stopPropagation();
-                            // TODO: Implement WhatsApp integration
                         }}
                     >
                         <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
@@ -241,10 +213,8 @@ const ClientModule = ({
         </TouchableOpacity>
     );
 };
-
 const styles = StyleSheet.create({
     card: {
-        // All styles applied inline using theme
     },
     cardHeader: {
         flexDirection: 'row',
@@ -254,32 +224,28 @@ const styles = StyleSheet.create({
     clientInfo: {
         flex: 1,
     },
-    clientName: {
-        // Styles applied inline using theme
-    },
-    debtText: {
-        // Styles applied inline using theme
-    },
     actionButtons: {
         flexDirection: 'row',
-    },
-    actionButton: {
-        // Styles applied inline using theme
-    },
-    address: {
-        // Styles applied inline using theme
     },
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    lastTransaction: {
-        // Styles applied inline using theme
+    clientName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 4,
     },
-    whatsappButton: {
-        // Styles applied inline using theme
+    debtText: {
+        fontSize: 14,
+        marginTop: 4,
+    },
+    actionButton: {
+        marginLeft: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 4,
     },
 });
-
 export default ClientModule;

@@ -33,9 +33,6 @@
         "backgroundColor": "#fff"
       },
       "permissions": [
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE",
-        "android.permission.WAKE_LOCK",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE"
       ],
@@ -73,13 +70,6 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "color": "#20B2AA",
-          "defaultChannel": "default"
         }
       ]
     ],

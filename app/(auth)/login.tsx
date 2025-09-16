@@ -8,14 +8,12 @@ import { GoogleAuthProvider, signInWithCredential, getAuth, signInWithPopup } fr
 import { auth } from '@/firebaseConfig';
 import { useAuth } from '@/context/AuthProvider';
 import Constants from 'expo-constants';
-
 export default function LoginScreen() {
   const router = useRouter();
   const { signInWithEmail, signUpWithEmail, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-
   const handleLogin = async () => {
     try {
       setError(null);
@@ -25,7 +23,6 @@ export default function LoginScreen() {
       setError(e?.message || 'Error al iniciar sesión');
     }
   };
-
   const handleRegister = async () => {
     try {
       setError(null);
@@ -35,9 +32,7 @@ export default function LoginScreen() {
       setError(e?.message || 'Error al registrarse');
     }
   };
-
   WebBrowser.maybeCompleteAuthSession();
-
   const handleGoogle = async () => {
     try {
       setError(null);
@@ -48,34 +43,28 @@ export default function LoginScreen() {
         router.replace('/(company)');
         return;
       }
-
       const googleClientId = (Constants?.expoConfig?.extra as any)?.googleClientId as string | undefined;
       if (!googleClientId) {
         throw new Error('Falta configurar googleClientId en app.json -> expo.extra.googleClientId');
       }
-
-      const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+      const redirectUri = AuthSession.makeRedirectUri();
       const discovery = {
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenEndpoint: 'https://oauth2.googleapis.com/token',
       } as const;
-
       const request = new AuthSession.AuthRequest({
         clientId: googleClientId,
         redirectUri,
         scopes: ['openid', 'profile', 'email'],
         responseType: AuthSession.ResponseType.IdToken,
-        // Google no admite PKCE con response_type=id_token
         usePKCE: false,
         extraParams: { prompt: 'select_account' },
       });
-
-      const result = await request.promptAsync(discovery, { useProxy: true });
+      const result = await request.promptAsync(discovery);
       const idToken = (result as any)?.params?.id_token as string | undefined;
       if (!idToken) {
         throw new Error('No se obtuvo idToken de Google');
       }
-
       const credential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, credential);
       router.replace('/(company)');
@@ -83,14 +72,12 @@ export default function LoginScreen() {
       setError(e?.message || 'Error con Google');
     }
   };
-
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.headerBg}>
         <AppLogo size="large" showText={true} style={styles.logoContainer} />
         <Text style={styles.subtitle}>Gestión simple y segura</Text>
       </View>
-
       <View style={styles.container}>
         <View style={styles.card}>
           <Text style={styles.title}>Bienvenido</Text>
@@ -118,14 +105,12 @@ export default function LoginScreen() {
               onChangeText={setPassword}
             />
           </View>
-
           <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
             <Text style={styles.primaryText}>Entrar</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={handleRegister}>
             <Text style={styles.secondaryText}>Crear cuenta</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.googleButton} onPress={handleGoogle}>
             <Text style={styles.googleText}>Entrar con Google</Text>
           </TouchableOpacity>
@@ -134,7 +119,6 @@ export default function LoginScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'rgb(235, 235, 235)' },
   headerBg: {
@@ -142,8 +126,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 5, // Fixed syntax error
-    borderColor: '#20B2AA', // Turquoise del logo
+    borderBottomWidth: 5,
+    borderColor: '#20B2AA',
   },
   logoContainer: {
     marginBottom: 8,
@@ -163,5 +147,3 @@ const styles = StyleSheet.create({
   googleText: { color: '#111827', fontWeight: '600' },
   error: { color: 'red', marginBottom: 10, textAlign: 'center' },
 });
-
-

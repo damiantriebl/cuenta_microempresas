@@ -1,0 +1,176 @@
+{
+  "timestamp": "2025-09-16T02:04:19.977Z",
+  "overall": {
+    "passed": false,
+    "score": 63,
+    "grade": "D"
+  },
+  "deadCodeAnalysis": {
+    "knip": {
+      "passed": true,
+      "issues": [],
+      "warnings": [
+        "Command failed: pnpm run analyze:dead-code\napp.config.js        knip.json     \u001b[90mRemove redundant \u001b[97mentry\u001b[90m pattern\u001b[39m\nmetro.config.js      knip.json     \u001b[90mRemove redundant \u001b[97mentry\u001b[90m pattern\u001b[39m\nbabel.config.js      knip.json     \u001b[90mRemove redundant \u001b[97mentry\u001b[90m pattern\u001b[39m\nexpo-router/entry    package.json  \u001b[90mPackage entry file not found\u001b[39m  \n"
+      ]
+    },
+    "tsPrune": {
+      "passed": true,
+      "issues": [],
+      "warnings": []
+    },
+    "unimported": {
+      "passed": true,
+      "issues": [],
+      "warnings": [
+        "Tool is initializing - no unimported files detected"
+      ]
+    }
+  },
+  "dependencyAnalysis": {
+    "depcheck": {
+      "passed": false,
+      "unused": [],
+      "missing": [
+        "Depcheck analysis failed: Command failed: pnpm run analyze:deps"
+      ]
+    },
+    "packageJson": {
+      "passed": true,
+      "issues": []
+    }
+  },
+  "assetAnalysis": {
+    "unusedAssets": {
+      "passed": false,
+      "unused": [
+        "📎 Found asset reference: assets/fonts/SpaceMono-Regular.ttf in app\\_layout.tsx",
+        "📎 Found asset reference: assets/images/logo.png in components\\AppLogo.tsx",
+        "📎 Found asset reference: assets/images/icon.png in scripts\\prepare-production.js",
+        "📎 Found asset reference: assets/images/adaptive-icon.png in scripts\\prepare-production.js",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/fonts/font.ttf in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/favicon.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/icon.png in docs\\APP_CONFIGURATION.md",
+        "📎 Found asset reference: assets/images/icon.png in docs\\APP_CONFIGURATION.md",
+        "📎 Found asset reference: assets/images/old-logo.png in docs\\EJEMPLOS_USO_LIMPIEZA.md",
+        "📎 Found asset reference: assets/fonts/unused-font.ttf in docs\\EJEMPLOS_USO_LIMPIEZA.md",
+        "📎 Found asset reference: assets/icons/deprecated-icon.svg in docs\\EJEMPLOS_USO_LIMPIEZA.md",
+        "📎 Found asset reference: assets/images/icon.png in docs\\EXPO_GO_DEVELOPMENT_TROUBLESHOOTING.md",
+        "📎 Found asset reference: assets/removed-image.png in docs\\SOLUCION_PROBLEMAS_LIMPIEZA.md",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "- assets/images/partial-react-logo.png",
+        "- assets/images/react-logo.png",
+        "- assets/images/react-logo@2x.png",
+        "- assets/images/react-logo@3x.png",
+        "- assets/images/splash-icon.png",
+        "- assets/images/react-logo@3x.png (20.75 KB)",
+        "- assets/images/splash-icon.png (17.14 KB)",
+        "- assets/images/react-logo@2x.png (13.89 KB)",
+        "- assets/images/react-logo.png (6.19 KB)",
+        "- assets/images/partial-react-logo.png (4.96 KB)"
+      ],
+      "totalSize": 64440.32
+    },
+    "referencedAssets": {
+      "passed": true,
+      "referenced": [
+        "📎 Found asset reference: assets/fonts/SpaceMono-Regular.ttf in app\\_layout.tsx",
+        "📎 Found asset reference: assets/images/logo.png in components\\AppLogo.tsx",
+        "📎 Found asset reference: assets/images/icon.png in scripts\\prepare-production.js",
+        "📎 Found asset reference: assets/images/adaptive-icon.png in scripts\\prepare-production.js",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/fonts/font.ttf in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/logo.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/favicon.png in scripts\\README-asset-management.md",
+        "📎 Found asset reference: assets/images/icon.png in docs\\APP_CONFIGURATION.md",
+        "📎 Found asset reference: assets/images/icon.png in docs\\APP_CONFIGURATION.md",
+        "📎 Found asset reference: assets/images/old-logo.png in docs\\EJEMPLOS_USO_LIMPIEZA.md",
+        "📎 Found asset reference: assets/fonts/unused-font.ttf in docs\\EJEMPLOS_USO_LIMPIEZA.md",
+        "📎 Found asset reference: assets/icons/deprecated-icon.svg in docs\\EJEMPLOS_USO_LIMPIEZA.md",
+        "📎 Found asset reference: assets/images/icon.png in docs\\EXPO_GO_DEVELOPMENT_TROUBLESHOOTING.md",
+        "📎 Found asset reference: assets/removed-image.png in docs\\SOLUCION_PROBLEMAS_LIMPIEZA.md",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "📎 Found asset reference: assets/images/logo.png in app.json",
+        "  - assets/fonts/SpaceMono-Regular.ttf",
+        "  - assets/fonts/font.ttf",
+        "  - assets/fonts/unused-font.ttf",
+        "  - assets/icons/deprecated-icon.svg",
+        "  - assets/images/adaptive-icon.png",
+        "  - assets/images/favicon.png",
+        "  - assets/images/icon.png",
+        "  - assets/images/logo.png",
+        "  - assets/images/old-logo.png",
+        "  - assets/removed-image.png"
+      ]
+    }
+  },
+  "configAnalysis": {
+    "typescript": {
+      "passed": false,
+      "issues": [
+        "Unable to parse tsconfig.json - using minimal config for validation",
+        "strict mode not enabled",
+        "noUnusedLocals not enabled (commented out)",
+        "noUnusedParameters not enabled (commented out)",
+        "exactOptionalPropertyTypes not enabled (commented out)",
+        "noFallthroughCasesInSwitch not enabled",
+        "TypeScript compilation failed"
+      ]
+    },
+    "expo": {
+      "passed": true,
+      "issues": []
+    },
+    "firebase": {
+      "passed": true,
+      "issues": []
+    }
+  },
+  "requirementValidation": {
+    "req1_1": {
+      "passed": true,
+      "description": "Dead code elimination"
+    },
+    "req1_2": {
+      "passed": false,
+      "description": "Unused imports/exports removal"
+    },
+    "req2_1": {
+      "passed": false,
+      "description": "Dependency optimization"
+    },
+    "req3_1": {
+      "passed": false,
+      "description": "Asset management"
+    },
+    "req4_1": {
+      "passed": false,
+      "description": "Configuration normalization"
+    }
+  },
+  "summary": {
+    "totalIssues": 39,
+    "deadCodeIssues": 0,
+    "dependencyIssues": 1,
+    "assetIssues": 31,
+    "configIssues": 7,
+    "requirementsPassed": 1,
+    "totalRequirements": 5
+  },
+  "recommendations": [
+    "Agregar dependencias faltantes al package.json",
+    "Remover 31 assets no utilizados (63KB)",
+    "Corregir problemas de configuración TypeScript y habilitar configuraciones de modo estricto",
+    "4 requisitos de limpieza aún necesitan ser atendidos"
+  ]
+}

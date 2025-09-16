@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "Cuenta Microempresas - Gestión de Ventas",
+    "slug": "cuenta-microempresas",
+    "version": "1.0.1",
+    "jsEngine": "hermes",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "cuenta-microempresas",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "privacy": "public",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "description": "Aplicación para gestión de ventas, clientes y productos para pequeñas empresas",
+    "keywords": [
+      "ventas",
+      "gestión",
+      "clientes",
+      "productos",
+      "empresa"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ukn.cuentamicroempresas"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#fff"
+      },
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "package": "com.ukn.cuentamicroempresas",
+      "versionCode": 2
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/logo.png",
+      "name": "Cuenta Microempresas",
+      "shortName": "Campo",
+      "lang": "es",
+      "scope": "/",
+      "themeColor": "#25B4BD",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/"
+    },
+    "extra": {
+      "googleClientId": "752493866551-92vnat1ff88sgprnadjukd816p1cjsqp.apps.googleusercontent.com",
+      "router": {},
+      "eas": {
+        "projectId": "3dc127bf-00d4-4447-a8ea-eaaeae7a6276"
+      }
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#20B2AA",
+          "defaultChannel": "default"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "owner": "demt"
+  }
+}

@@ -30,73 +30,41 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
 import { Company, CreateCompanyData } from '@/schemas/types';
-
 export default function CompanyScreen() {
   const router = useRouter();
   const { user, empresas, setEmpresaId, refreshEmpresas, signOutApp } = useAuth();
-
-
-
-  // Form states
   const [nombreNueva, setNombreNueva] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-
-  // Data states
   const [todasEmpresas, setTodasEmpresas] = useState<Company[]>([]);
   const [loadingEmpresas, setLoadingEmpresas] = useState(false);
   const [userPendingRequests, setUserPendingRequests] = useState<Set<string>>(new Set());
-
-  // Form validation
   const [nombreError, setNombreError] = useState('');
-
-  // Pending requests count for owned companies
   const [pendingRequestsCount, setPendingRequestsCount] = useState<{ [key: string]: number }>({});
-
-  // Companies details for user memberships
   const [userCompaniesDetails, setUserCompaniesDetails] = useState<{ [key: string]: Company }>({});
-
   const loadPendingRequestsCounts = useCallback(async () => {
     if (!user) return;
-
-    console.log('loadPendingRequestsCounts called', { user: user.uid, empresas });
-
     const counts: { [key: string]: number } = {};
     const companiesDetails: { [key: string]: Company } = {};
-
-    // Only check for owned companies
     const ownedCompanies = empresas.filter(membership => membership.role === 'owner');
-    console.log('Owned companies found', ownedCompanies);
-
     await Promise.all(
       ownedCompanies.map(async (membership) => {
         try {
-          console.log(`Loading data for company ${membership.empresaId}`);
-
           const requests = await getPendingJoinRequests(membership.empresaId);
           counts[membership.empresaId] = requests.length;
-          console.log(`Requests count for ${membership.empresaId}: ${requests.length}`);
-
-          // Also load company details for toggle functionality
           const company = await getCompany(membership.empresaId);
-          console.log(`Company details for ${membership.empresaId}:`, company);
-
           if (company) {
-            // Auto-migrate if solicitudesAbiertas is undefined
             if (company.solicitudesAbiertas === undefined) {
-              console.log(`Auto-migrating solicitudesAbiertas for ${membership.empresaId}`);
               try {
                 await toggleCompanyJoinRequests(membership.empresaId, false);
                 company.solicitudesAbiertas = false;
-                console.log(`Auto-migration completed for ${membership.empresaId}`);
               } catch (error) {
                 console.error('Error auto-migrating company:', error);
-                company.solicitudesAbiertas = false; // Set locally anyway
+                company.solicitudesAbiertas = false;
               }
             }
             companiesDetails[membership.empresaId] = company;
-            console.log(`Company details stored for ${membership.empresaId}:`, company);
           }
         } catch (error) {
           console.error(`Error loading requests for ${membership.empresaId}:`, error);
@@ -104,25 +72,18 @@ export default function CompanyScreen() {
         }
       })
     );
-
-    console.log('Final counts and details:', { counts, companiesDetails });
-
     setPendingRequestsCount(counts);
     setUserCompaniesDetails(companiesDetails);
   }, [user, empresas]);
-
   useEffect(() => {
     fetchAllCompanies();
     loadPendingRequestsCounts();
   }, [loadPendingRequestsCounts]);
-
   useEffect(() => {
-    // Reload pending requests when empresas change
     if (empresas.length > 0) {
       loadPendingRequestsCounts();
     }
   }, [empresas, loadPendingRequestsCounts]);
-
   const fetchAllCompanies = async () => {
     setLoadingEmpresas(true);
     try {
@@ -134,11 +95,9 @@ export default function CompanyScreen() {
       const companies = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
-        solicitudesAbiertas: doc.data().solicitudesAbiertas ?? false // Default to false (CLOSED) if missing
+        solicitudesAbiertas: doc.data().solicitudesAbiertas ?? false
       } as Company));
       setTodasEmpresas(companies);
-
-      // También cargar las solicitudes pendientes del usuario
       await loadUserPendingRequests();
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -147,115 +106,81 @@ export default function CompanyScreen() {
       setLoadingEmpresas(false);
     }
   };
-
   const loadUserPendingRequests = async () => {
     if (!user) return;
-
     try {
-      // Buscar solicitudes pendientes del usuario actual
       const q = query(
         collection(db, 'solicitudesEmpresa'),
         orderBy('creado', 'desc')
       );
       const snapshot = await getDocs(q);
       const pendingRequests = new Set<string>();
-
       snapshot.docs.forEach(doc => {
         const request = doc.data();
         if (request.solicitanteId === user.uid && request.estado === 'pendiente') {
           pendingRequests.add(request.empresaId);
         }
       });
-
       setUserPendingRequests(pendingRequests);
     } catch (error) {
       console.error('Error loading user pending requests:', error);
     }
   };
-
   const empresasFiltradas = useMemo(() => {
-    // Excluir empresas en las que el usuario ya es miembro/propietario
     const membershipIds = new Set(empresas.map(m => m.empresaId));
-
     const disponibles = todasEmpresas.filter(empresa => {
-      // Excluir empresas donde ya es miembro
       const isNotMember = !membershipIds.has(empresa.id);
-      // Solo mostrar empresas con solicitudes ABIERTAS (true)
       const hasOpenRequests = empresa.solicitudesAbiertas === true;
-
-
-
       return isNotMember && hasOpenRequests;
     });
-
     if (!busqueda.trim()) return disponibles;
-
     const term = busqueda.toLowerCase().trim();
     return disponibles.filter(empresa =>
       empresa.nombre?.toLowerCase().includes(term)
     );
   }, [todasEmpresas, busqueda, empresas]);
-
   const validateCompanyName = (name: string): boolean => {
     const trimmedName = name.trim();
-
     if (!trimmedName) {
       setNombreError('El nombre de la empresa es requerido');
       return false;
     }
-
     if (trimmedName.length < 3) {
       setNombreError('El nombre debe tener al menos 3 caracteres');
       return false;
     }
-
     if (trimmedName.length > 50) {
       setNombreError('El nombre no puede exceder 50 caracteres');
       return false;
     }
-
-    // Check if company name already exists
     const nameExists = todasEmpresas.some(empresa =>
       empresa.nombre?.toLowerCase() === trimmedName.toLowerCase()
     );
-
     if (nameExists) {
       setNombreError('Ya existe una empresa con este nombre');
       return false;
     }
-
     setNombreError('');
     return true;
   };
-
   const handleCrearEmpresa = async () => {
     if (!user) {
       Alert.alert('Error', 'Usuario no autenticado');
       return;
     }
-
     const nombreTrimmed = nombreNueva.trim();
-
     if (!validateCompanyName(nombreTrimmed)) {
       return;
     }
-
     setIsCreating(true);
-
     try {
       const companyData: CreateCompanyData = {
         nombre: nombreTrimmed,
         propietario: user.email || user.uid
       };
-
       const empresaId = await createCompany(companyData, user.uid);
-
-      // Refresh user's company memberships
       await refreshEmpresas();
-
-      // Set the new company as active
       setEmpresaId(empresaId);
-
       Alert.alert(
         'Empresa creada',
         `La empresa "${nombreTrimmed}" ha sido creada exitosamente`,
@@ -266,7 +191,6 @@ export default function CompanyScreen() {
           }
         ]
       );
-
     } catch (error) {
       console.error('Error creating company:', error);
       Alert.alert('Error', 'No se pudo crear la empresa. Intenta nuevamente.');
@@ -274,17 +198,14 @@ export default function CompanyScreen() {
       setIsCreating(false);
     }
   };
-
   const handleSeleccionarEmpresa = async (empresaId: string) => {
     try {
-      // Verify company still exists
       const company = await getCompany(empresaId);
       if (!company) {
         Alert.alert('Error', 'La empresa seleccionada ya no existe');
         await refreshEmpresas();
         return;
       }
-
       setEmpresaId(empresaId);
       router.replace('/(tabs)');
     } catch (error) {
@@ -292,30 +213,23 @@ export default function CompanyScreen() {
       Alert.alert('Error', 'No se pudo acceder a la empresa');
     }
   };
-
   const handleSolicitarAcceso = async (empresaId: string, empresaNombre: string) => {
     if (!user) {
       Alert.alert('Error', 'Usuario no autenticado');
       return;
     }
-
-    // Check if user is already a member
     const isMember = empresas.some(membership => membership.empresaId === empresaId);
     if (isMember) {
       Alert.alert('Información', 'Ya eres miembro de esta empresa');
       return;
     }
-
     setIsSearching(true);
-
     try {
-      // Check if company allows join requests
       const company = await getCompany(empresaId);
       if (!company) {
         Alert.alert('Error', 'La empresa ya no existe');
         return;
       }
-
       if (company.solicitudesAbiertas !== true) {
         Alert.alert(
           'Solicitudes cerradas',
@@ -323,18 +237,13 @@ export default function CompanyScreen() {
         );
         return;
       }
-
       await createJoinRequest(empresaId, user.uid, user.email || '');
-
-      // Actualizar el estado local inmediatamente
       setUserPendingRequests(prev => new Set(prev).add(empresaId));
-
       Alert.alert(
         'Solicitud enviada',
         `Tu solicitud para unirte a "${empresaNombre}" ha sido enviada. El propietario recibirá una notificación.`,
         [{ text: 'Entendido' }]
       );
-
     } catch (error) {
       console.error('Error creating join request:', error);
       Alert.alert('Error', 'No se pudo enviar la solicitud. Intenta nuevamente.');
@@ -342,44 +251,23 @@ export default function CompanyScreen() {
       setIsSearching(false);
     }
   };
-
   const handleViewRequests = (empresaId: string) => {
     router.push({
       pathname: '/(company)/requests',
       params: { empresaId }
     });
   };
-
   const handleViewMembers = (empresaId: string) => {
     router.push({
       pathname: '/(company)/members',
       params: { empresaId }
     });
   };
-
   const handleToggleRequests = async (empresaId: string, companyName: string, currentStatus: boolean) => {
-    console.log('handleToggleRequests called', {
-      empresaId,
-      companyName,
-      currentStatus
-    });
-
     const newStatus = !currentStatus;
     const action = newStatus ? 'abrir' : 'cerrar';
-
-    console.log('Toggle action determined', {
-      currentStatus,
-      newStatus,
-      action
-    });
-
-    console.log('Executing toggle action directly', { action, empresaId, newStatus });
     try {
-      console.log('Calling toggleCompanyJoinRequests', { empresaId, newStatus });
       await toggleCompanyJoinRequests(empresaId, newStatus);
-      console.log('toggleCompanyJoinRequests completed successfully');
-
-      // IMMEDIATELY update local state
       setUserCompaniesDetails(prev => {
         const updated = {
           ...prev,
@@ -388,26 +276,18 @@ export default function CompanyScreen() {
             solicitudesAbiertas: newStatus
           }
         };
-        console.log('Updated local state', { prev, updated });
         return updated;
       });
-
       Alert.alert(
         'Éxito',
         `Las solicitudes han sido ${newStatus ? 'abiertas' : 'cerradas'} para "${companyName}"`
       );
-
-      // Also refresh from server to be sure
-      console.log('Refreshing data from server');
       await fetchAllCompanies();
       await loadPendingRequestsCounts();
-      console.log('Data refresh completed');
     } catch (error) {
-      console.error('Error toggling requests:', error);
       Alert.alert('Error', `No se pudo ${action} las solicitudes`);
     }
   };
-
   const handleLogout = () => {
     Alert.alert(
       'Cerrar Sesión',
@@ -423,9 +303,7 @@ export default function CompanyScreen() {
           onPress: async () => {
             try {
               await signOutApp();
-              // La navegación se manejará automáticamente por el AuthProvider
             } catch (error) {
-              console.error('Error signing out:', error);
               Alert.alert('Error', 'No se pudo cerrar la sesión. Intenta nuevamente.');
             }
           },
@@ -433,11 +311,9 @@ export default function CompanyScreen() {
       ]
     );
   };
-
   const renderCompanyItem = ({ item }: { item: Company }) => {
     const isMember = empresas.some(membership => membership.empresaId === item.id);
     const hasPendingRequest = userPendingRequests.has(item.id);
-
     return (
       <View style={styles.companyItem}>
         <View style={styles.companyInfo}>
@@ -446,7 +322,6 @@ export default function CompanyScreen() {
             Creada: {item.creado?.toDate?.()?.toLocaleDateString() || 'Fecha no disponible'}
           </Text>
         </View>
-
         {isMember ? (
           <View style={styles.memberBadge}>
             <Text style={styles.memberBadgeText}>Miembro</Text>
@@ -467,14 +342,12 @@ export default function CompanyScreen() {
       </View>
     );
   };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Header with logout button */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity
@@ -489,8 +362,6 @@ export default function CompanyScreen() {
             Selecciona una empresa existente o crea una nueva para comenzar
           </Text>
         </View>
-
-        {/* User's Companies Section */}
         {empresas.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mis Empresas</Text>
@@ -520,8 +391,6 @@ export default function CompanyScreen() {
                     </Text>
                   </View>
                 </TouchableOpacity>
-
-                {/* Show management buttons for owners */}
                 {membership.role === 'owner' ? (
                   <View style={styles.managementButtons}>
                     <TouchableOpacity
@@ -537,14 +406,12 @@ export default function CompanyScreen() {
                         )}
                       </Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       style={styles.membersButton}
                       onPress={() => handleViewMembers(membership.empresaId)}
                     >
                       <Text style={styles.membersButtonText}>Miembros</Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       style={[
                         styles.toggleRequestsButton,
@@ -552,12 +419,6 @@ export default function CompanyScreen() {
                       ]}
                       onPress={() => {
                         const currentCompany = userCompaniesDetails[membership.empresaId];
-                        console.log('Toggle button pressed', {
-                          empresaId: membership.empresaId,
-                          currentCompany,
-                          solicitudesAbiertas: currentCompany?.solicitudesAbiertas,
-                          userCompaniesDetails
-                        });
                         handleToggleRequests(
                           membership.empresaId,
                           membership.companyName || 'Empresa',
@@ -584,8 +445,6 @@ export default function CompanyScreen() {
             ))}
           </View>
         )}
-
-        {/* Create New Company Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Crear Nueva Empresa</Text>
           <View style={styles.createForm}>
@@ -607,7 +466,6 @@ export default function CompanyScreen() {
             {nombreError ? (
               <Text style={styles.errorText}>{nombreError}</Text>
             ) : null}
-
             <TouchableOpacity
               style={[styles.createButton, isCreating && styles.disabledButton]}
               onPress={handleCrearEmpresa}
@@ -621,8 +479,6 @@ export default function CompanyScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Search Companies Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Buscar Empresas Existentes</Text>
           <TextInput
@@ -633,7 +489,6 @@ export default function CompanyScreen() {
             autoCapitalize="none"
             returnKeyType="search"
           />
-
           {loadingEmpresas ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#25B4BD" />
@@ -663,7 +518,6 @@ export default function CompanyScreen() {
     </KeyboardAvoidingView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -740,8 +594,6 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 16,
   },
-
-  // User Companies Styles
   userCompanyContainer: {
     marginBottom: 8,
   },
@@ -842,8 +694,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
-
-  // Create Form Styles
   createForm: {
     gap: 12,
   },
@@ -881,8 +731,6 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
-
-  // Search Styles
   searchInput: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -892,8 +740,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginBottom: 16,
   },
-
-  // Company List Styles
   companiesList: {
     maxHeight: 300,
   },
@@ -923,8 +769,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
   },
-
-  // Badge Styles
   roleBadge: {
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -968,8 +812,6 @@ const styles = StyleSheet.create({
   ownerBadgeText: {
     color: '#fff',
   },
-
-  // Join Button Styles
   joinButton: {
     backgroundColor: '#279D2E',
     paddingVertical: 8,
@@ -983,8 +825,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-
-  // Loading and Empty States
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 32,
@@ -1004,5 +844,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-

@@ -1,0 +1,21 @@
+{
+  "entry": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "services/**/*.{ts,tsx}",
+    "hooks/**/*.{ts,tsx}",
+    "context/**/*.{ts,tsx}",
+    "schemas/**/*.{ts,tsx}",
+    "scripts/**/*.{ts,tsx,js}",
+    "*.{ts,tsx,js}"
+  ],
+  "extensions": [".ts", ".tsx", ".js", ".jsx"],
+  "ignorePatterns": [
+    "node_modules/**",
+    ".expo/**",
+    "dist/**",
+    "android/**",
+    "**/*.test.{ts,tsx,js}",
+    "**/__tests__/**"
+  ]
+}

@@ -5,7 +5,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '@/context/AuthProvider';
 import { ClientSelectionProvider } from '@/context/ClientSelectionProvider';
@@ -13,26 +12,20 @@ import { ThemeProvider } from '@/context/ThemeProvider';
 import { RealtimeDataProvider } from '@/context/RealtimeDataProvider';
 import { ToastProvider } from '@/context/ToastProvider';
 import OfflineStatusBar from '@/components/OfflineStatusBar';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
-
   if (!loaded) {
     return null;
   }
-
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ThemeProvider>
@@ -51,11 +44,9 @@ export default function RootLayout() {
     </NavigationThemeProvider>
   );
 }
-
 function AppNavigator() {
   const router = useRouter();
   const { user, empresaId, loading } = useAuth();
-
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -68,7 +59,6 @@ function AppNavigator() {
     }
     router.replace('/(tabs)');
   }, [user, empresaId, loading]);
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />

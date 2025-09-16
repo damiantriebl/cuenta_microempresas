@@ -21,8 +21,6 @@ import ProductService from '@/services/ProductService';
 import { CreateSaleEventData, CreatePaymentEventData, CreateProductData, Product, TransactionEvent, UpdateTransactionEventData } from '@/schemas/types';
 import { Timestamp } from 'firebase/firestore';
 import { TransactionEventService } from '@/services/TransactionEventService';
-
-
 export default function HistoryScreen() {
   const { empresaId } = useAuth();
   const { selectedClient, clearSelection } = useClientSelection();
@@ -34,7 +32,6 @@ export default function HistoryScreen() {
     refreshEvents
   } = useClientEvents();
   const router = useRouter();
-
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const productService = ProductService.getInstance();
@@ -42,8 +39,6 @@ export default function HistoryScreen() {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<TransactionEvent | null>(null);
   const [notesEvent, setNotesEvent] = useState<TransactionEvent | null>(null);
-
-  // Sync selected client with real-time data provider
   useEffect(() => {
     if (selectedClient && selectedClient.id !== selectedClientId) {
       setSelectedClientId(selectedClient.id);
@@ -51,18 +46,13 @@ export default function HistoryScreen() {
       setSelectedClientId(null);
     }
   }, [selectedClient, selectedClientId, setSelectedClientId]);
-
-  // Handle transaction creation
   const handleCreateTransaction = () => {
     if (!selectedClient) {
       Alert.alert('Error', 'Selecciona un cliente primero');
       return;
     }
-
     setShowTransactionModal(true);
   };
-
-  // Create Sale
   const handleCreateSale = async (saleData: CreateSaleEventData) => {
     if (!empresaId) return;
     if (!saleData.clienteId) {
@@ -74,7 +64,6 @@ export default function HistoryScreen() {
       const result = await TransactionEventService.createSaleEvent(empresaId, saleData);
       if (result.success) {
         setShowTransactionModal(false);
-        // Real-time listener will update transactions automatically
         refreshEvents();
       } else {
         Alert.alert('Error', result.errors?.join('\n') || 'Error al crear la venta');
@@ -86,8 +75,6 @@ export default function HistoryScreen() {
       setIsLoading(false);
     }
   };
-
-  // Create Payment
   const handleCreatePayment = async (paymentData: CreatePaymentEventData) => {
     if (!empresaId) return;
     if (!paymentData.clienteId) {
@@ -110,8 +97,6 @@ export default function HistoryScreen() {
       setIsLoading(false);
     }
   };
-
-  // Create Product (from modal quick-create)
   const handleCreateProduct = async (productData: CreateProductData): Promise<Product | null> => {
     if (!empresaId) return null;
     try {
@@ -135,13 +120,10 @@ export default function HistoryScreen() {
       return null;
     }
   };
-
-  // Edit handlers
   const handleEditEvent = (event: TransactionEvent) => {
     setEditingEvent(event);
     setShowEditModal(true);
   };
-
   const handleUpdateEvent = async (eventId: string, updateData: UpdateTransactionEventData) => {
     if (!empresaId) return;
     setIsLoading(true);
@@ -158,7 +140,6 @@ export default function HistoryScreen() {
       setIsLoading(false);
     }
   };
-
   const handleDeleteEvent = async (eventId: string) => {
     if (!empresaId) return;
     setIsLoading(true);
@@ -175,19 +156,13 @@ export default function HistoryScreen() {
       setIsLoading(false);
     }
   };
-
   const handleViewNotes = (event: TransactionEvent) => {
     setNotesEvent(event);
     setShowNotesModal(true);
   };
-
-  // Navigate to client selection
   const handleSelectClient = () => {
     router.push('/(tabs)/clientes');
   };
-
-  // Manual refresh no usado, se elimina para evitar warnings
-
   if (!empresaId) {
     return (
       <SafeAreaView style={styles.container}>
@@ -197,10 +172,9 @@ export default function HistoryScreen() {
       </SafeAreaView>
     );
   }
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.title}>Historial</Text>
@@ -208,7 +182,6 @@ export default function HistoryScreen() {
             <Text style={styles.subtitle}>{selectedClient.nombre}</Text>
           )}
         </View>
-
         <View style={styles.headerActions}>
           {selectedClient && (
             <>
@@ -229,11 +202,9 @@ export default function HistoryScreen() {
           )}
         </View>
       </View>
-
-      {/* Content */}
+      {}
       <View style={styles.content}>
         {!selectedClient ? (
-          // No client selected state
           <View style={styles.emptyContainer}>
             <Ionicons name="person-outline" size={64} color="#ccc" />
             <Text style={styles.emptyTitle}>Ningún cliente seleccionado</Text>
@@ -249,13 +220,11 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           </View>
         ) : eventsLoading ? (
-          // Loading state
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#25B4BD" />
             <Text style={styles.loadingText}>Cargando historial...</Text>
           </View>
         ) : (
-          // Transaction history
           <TransactionHistoryList
             events={transactions}
             onEditEvent={(event) => handleEditEvent(event)}
@@ -264,8 +233,7 @@ export default function HistoryScreen() {
           />
         )}
       </View>
-
-      {/* Transaction Modal */}
+      {}
       {selectedClient && (
         <TransactionModal
           visible={showTransactionModal}
@@ -278,8 +246,7 @@ export default function HistoryScreen() {
           isLoading={isLoading}
         />
       )}
-
-      {/* Transaction Edit Modal */}
+      {}
       {selectedClient && (
         <TransactionEditModal
           visible={showEditModal}
@@ -295,8 +262,7 @@ export default function HistoryScreen() {
           isLoading={isLoading}
         />
       )}
-
-      {/* Notes Modal */}
+      {}
       {selectedClient && (
         <NotesModal
           visible={showNotesModal}
@@ -311,7 +277,6 @@ export default function HistoryScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

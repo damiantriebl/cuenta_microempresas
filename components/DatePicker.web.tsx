@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-
 export default function DatePickerModule({
     value,
     onChange,
@@ -12,7 +11,6 @@ export default function DatePickerModule({
 }) {
     const [date, setDate] = useState<Date | null>(value ?? new Date());
     const [showPicker, setShowPicker] = useState(false);
-
     const handleDateChange = (selectedDate: Date | null) => {
         if (selectedDate) {
             setDate(selectedDate);
@@ -20,14 +18,12 @@ export default function DatePickerModule({
         }
         setShowPicker(false);
     };
-
     return (
         <View style={styles.container}>
             <Text style={styles.label}>Fecha seleccionada:</Text>
             <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowPicker(true)}>
                 <Text style={styles.datePickerText}>{date?.toLocaleString()}</Text>
             </TouchableOpacity>
-
             {showPicker && (
                 <Modal visible transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
                     <View style={styles.webModalOverlay}>
@@ -35,7 +31,7 @@ export default function DatePickerModule({
                             <Text style={styles.modalTitle}>Seleccionar Fecha y Hora</Text>
                             <DatePicker
                                 selected={date}
-                                onChange={(d: Date) => handleDateChange(d)}
+                                onChange={(d: Date | null) => handleDateChange(d)}
                                 showTimeSelect
                                 dateFormat="Pp"
                                 inline
@@ -50,7 +46,6 @@ export default function DatePickerModule({
         </View>
     );
 }
-
 const styles = StyleSheet.create({
     container: { padding: 10 },
     label: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
@@ -85,5 +80,3 @@ const styles = StyleSheet.create({
     },
     closeButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });
-
-

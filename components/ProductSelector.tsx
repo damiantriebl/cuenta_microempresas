@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Product, CreateProductData } from '@/schemas/types';
 import ProductService from '@/services/ProductService';
 import { useAuth } from '@/context/AuthProvider';
-
 interface ProductSelectorProps {
   visible: boolean;
   onClose: () => void;
@@ -21,13 +20,11 @@ interface ProductSelectorProps {
   onCreateProduct?: (productData: CreateProductData) => Promise<Product | null>;
   selectedProductId?: string;
 }
-
 interface ProductWithPrices extends Product {
   cachedCosto?: number;
   cachedGanancia?: number;
   hasCachedPrices: boolean;
 }
-
 export default function ProductSelector({
   visible,
   onClose,
@@ -43,19 +40,13 @@ export default function ProductSelector({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const productService = ProductService.getInstance();
-
   const loadProducts = useCallback(async () => {
     if (!empresaId) {
-      console.log('ProductSelector.loadProducts: No empresaId available');
       return;
     }
-
-    console.log('ProductSelector.loadProducts: Starting to load products for empresaId:', empresaId);
     setIsLoading(true);
     try {
       const result = await productService.getProducts(empresaId);
-      console.log('ProductSelector.loadProducts: Service result:', result);
-
       if (!result.success || !result.data) {
         console.error('Error loading products: service failed', result.errors || result.error);
         Alert.alert('Error', result.errors?.join('\n') || 'No se pudieron cargar los productos');
@@ -63,18 +54,13 @@ export default function ProductSelector({
         return;
       }
       const productList = result.data;
-      console.log('ProductSelector.loadProducts: Product list received:', productList);
-
-      // Enhance products with cached price information and sort by position
       const enhancedProducts: ProductWithPrices[] = productList
         .map(product => {
-          // Use the ultimoCosto and ultimaGanancia from the product directly from database
           const hasValidPrices =
             product.ultimoCosto !== undefined &&
             product.ultimaGanancia !== undefined &&
             product.ultimoCosto > 0 &&
             product.ultimaGanancia > 0;
-
           return {
             ...product,
             cachedCosto: hasValidPrices ? product.ultimoCosto : undefined,
@@ -83,8 +69,6 @@ export default function ProductSelector({
           };
         })
         .sort((a, b) => a.posicion - b.posicion); // Sort by position
-
-      console.log('ProductSelector.loadProducts: Enhanced products (sorted by position):', enhancedProducts);
       setProducts(enhancedProducts);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -94,57 +78,46 @@ export default function ProductSelector({
       setIsLoading(false);
     }
   }, [empresaId, productService]);
-
   const filterProducts = useCallback(() => {
     if (!searchText.trim()) {
       setFilteredProducts([...products]);
       return;
     }
-
     const filtered = products.filter(product =>
       product.nombre.toLowerCase().includes(searchText.toLowerCase())
     );
     setFilteredProducts([...filtered]);
   }, [searchText, products]);
-
   useEffect(() => {
     if (visible && empresaId) {
       loadProducts();
     }
   }, [visible, empresaId, loadProducts]);
-
   useEffect(() => {
     filterProducts();
   }, [filterProducts]);
-
-  // Ensure filteredProducts is updated when products change
   useEffect(() => {
     if (products.length > 0) {
       filterProducts();
     }
   }, [products, filterProducts]);
-
   const handleSelectProduct = (product: ProductWithPrices) => {
     const cachedPrices = {
       ultimoCosto: product.cachedCosto,
       ultimaGanancia: product.cachedGanancia,
     };
-
     onSelectProduct(product, cachedPrices);
     onClose();
   };
-
   const handleCreateProduct = async () => {
     if (!newProductName.trim()) {
       Alert.alert('Error', 'Ingresa un nombre para el producto');
       return;
     }
-
     if (!onCreateProduct) {
       Alert.alert('Error', 'Función de creación no disponible');
       return;
     }
-
     setIsLoading(true);
     try {
       const productData: CreateProductData = {
@@ -155,10 +128,8 @@ export default function ProductSelector({
         ultimoCosto: 0,
         ultimaGanancia: 0,
       };
-
       const newProduct = await onCreateProduct(productData);
       if (newProduct) {
-        // Select the newly created product
         handleSelectProduct({
           ...newProduct,
           cachedCosto: undefined,
@@ -166,7 +137,6 @@ export default function ProductSelector({
           hasCachedPrices: false,
         });
       }
-
       setShowCreateForm(false);
       setNewProductName('');
     } catch (error) {
@@ -176,15 +146,12 @@ export default function ProductSelector({
       setIsLoading(false);
     }
   };
-
   const formatPrice = (price?: number) => {
     return price !== undefined ? `$${price.toFixed(2)}` : '-';
   };
-
   const renderProduct = ({ item: product }: { item: ProductWithPrices }) => {
     const isSelected = product.id === selectedProductId;
     const totalPrice = (product.cachedCosto || 0) + (product.cachedGanancia || 0);
-
     return (
       <TouchableOpacity
         style={[
@@ -197,7 +164,6 @@ export default function ProductSelector({
       >
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{product.nombre}</Text>
-
           {product.hasCachedPrices && (
             <View style={styles.priceInfo}>
               <Text style={styles.priceText}>
@@ -207,19 +173,16 @@ export default function ProductSelector({
               </Text>
             </View>
           )}
-
           {!product.hasCachedPrices && (
             <Text style={styles.noPriceText}>Sin precios guardados</Text>
           )}
         </View>
-
         {isSelected && (
           <Ionicons name="checkmark-circle" size={24} color="#fff" />
         )}
       </TouchableOpacity>
     );
   };
-
   const renderCreateForm = () => (
     <View style={styles.createForm}>
       <Text style={styles.createFormTitle}>Crear Nuevo Producto</Text>
@@ -252,7 +215,6 @@ export default function ProductSelector({
       </View>
     </View>
   );
-
   return (
     <Modal
       visible={visible}
@@ -268,7 +230,6 @@ export default function ProductSelector({
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
-
           {!showCreateForm && (
             <>
               <View style={styles.searchContainer}>
@@ -280,7 +241,6 @@ export default function ProductSelector({
                   placeholder="Buscar productos..."
                 />
               </View>
-
               <View style={styles.actions}>
                 {onCreateProduct && (
                   <TouchableOpacity
@@ -293,7 +253,6 @@ export default function ProductSelector({
                   </TouchableOpacity>
                 )}
               </View>
-
               <FlatList
                 data={filteredProducts}
                 renderItem={renderProduct}
@@ -317,14 +276,12 @@ export default function ProductSelector({
               />
             </>
           )}
-
           {showCreateForm && renderCreateForm()}
         </View>
       </View>
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,

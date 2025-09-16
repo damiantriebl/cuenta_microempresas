@@ -1,83 +1,1 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/context/ThemeProvider';
-
-interface ZeroBalanceSeparatorProps {
-  message?: string;
-}
-
-const ZeroBalanceSeparator: React.FC<ZeroBalanceSeparatorProps> = ({
-  message = 'cuenta en 0'
-}) => {
-  const { colors, spacing, typography, shadows } = useTheme();
-
-  return (
-    <View style={[styles.container, { marginVertical: spacing.lg }]}>
-      <View style={[styles.separatorWrapper, shadows.medium]}>
-        <LinearGradient
-          colors={['#FFE082', '#FFC107']}
-          style={[
-            styles.separator,
-            {
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.sm,
-              borderColor: '#f4d03f',
-            }
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Text style={[
-            styles.separatorText,
-            {
-              color: '#3a3a3a',
-              fontWeight: typography.fontWeight.bold,
-              fontSize: typography.fontSize.md,
-            }
-          ]}>{message}</Text>
-        </LinearGradient>
-      </View>
-
-      {/* Decorative lines */}
-      <View style={styles.decorativeLines}>
-        <View style={[styles.line, { backgroundColor: colors.borderLight, marginHorizontal: spacing.lg }]} />
-        <View style={[styles.line, { backgroundColor: colors.borderLight, marginHorizontal: spacing.lg }]} />
-      </View>
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    position: 'relative',
-  },
-  separatorWrapper: {
-    // Shadow will be applied inline using theme
-  },
-  separator: {
-    borderRadius: 25,
-    borderWidth: 2,
-  },
-  separatorText: {
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  decorativeLines: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: -1,
-  },
-  line: {
-    height: 2,
-    flex: 1,
-  },
-});
-
-export default ZeroBalanceSeparator;
+import React from 'react';import { View, Text, StyleSheet } from 'react-native';import { LinearGradient } from 'expo-linear-gradient';import { useTheme } from '@/context/ThemeProvider';interface ZeroBalanceSeparatorProps {  message?: string;}const ZeroBalanceSeparator: React.FC<ZeroBalanceSeparatorProps> = ({  message = 'cuenta en 0'}) => {  const { colors, spacing, typography, shadows } = useTheme();  return (    <View style={[styles.container, { marginVertical: spacing.lg }]}>      <View style={[styles.separatorWrapper, shadows.medium]}>        <LinearGradient          colors={['#FFE082', '#FFC107']}          style={[            styles.separator,            {              paddingHorizontal: spacing.lg,              paddingVertical: spacing.sm,              borderColor: '#f4d03f',            }          ]}          start={{ x: 0, y: 0 }}          end={{ x: 1, y: 1 }}        >          <Text style={[            styles.separatorText,            {              color: '#3a3a3a',              fontWeight: typography.fontWeight.bold,              fontSize: typography.fontSize.md,            }          ]}>{message}</Text>        </LinearGradient>      </View>      {}      <View style={styles.decorativeLines}>        <View style={[styles.line, { backgroundColor: colors.borderLight, marginHorizontal: spacing.lg }]} />        <View style={[styles.line, { backgroundColor: colors.borderLight, marginHorizontal: spacing.lg }]} />      </View>    </View>  );};const styles = StyleSheet.create({  container: {    alignItems: 'center',    position: 'relative',  },  separatorWrapper: {  },  separator: {    borderRadius: 25,    borderWidth: 2,  },  separatorText: {    textAlign: 'center',    textTransform: 'uppercase',    letterSpacing: 0.5,  },  decorativeLines: {    position: 'absolute',    top: '50%',    left: 0,    right: 0,    flexDirection: 'row',    justifyContent: 'space-between',    zIndex: -1,  },  line: {    height: 2,    flex: 1,  },});export default ZeroBalanceSeparator;

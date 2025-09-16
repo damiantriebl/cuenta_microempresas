@@ -1,0 +1,36 @@
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "services/**/*.{ts,tsx}",
+        "schemas/**/*.{ts,tsx}",
+        "hooks/**/*.{ts,tsx}",
+        "context/**/*.{ts,tsx}",
+        "scripts/**/*.{ts,tsx}",
+        "firebaseConfig.ts",
+        "app.config.js",
+        "metro.config.js",
+        "babel.config.js"
+      ],
+      "project": [
+        "**/*.{ts,tsx,js,jsx}",
+        "!node_modules/**",
+        "!dist/**",
+        "!.expo/**",
+        "!android/**",
+        "!ios/**"
+      ],
+      "ignore": [
+        "**/*.test.{ts,tsx,js,jsx}",
+        "**/__tests__/**",
+        "debug-*.ts",
+        "examples/**",
+        "scripts/test-*.js",
+        "scripts/validate-*.js",
+        "scripts/optimize-*.js"
+      ]
+    }
+  }
+}

@@ -1,8 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, ViewStyle, TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeProvider';
-
 interface ThemedButtonProps {
   title: string;
   onPress: () => void;
@@ -12,7 +11,6 @@ interface ThemedButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
-
 export function ThemedButton({
   title,
   onPress,
@@ -23,7 +21,6 @@ export function ThemedButton({
   textStyle,
 }: ThemedButtonProps) {
   const { colors, gradients, spacing, typography, shadows } = useTheme();
-
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       borderRadius: 8,
@@ -31,7 +28,6 @@ export function ThemedButton({
       justifyContent: 'center',
       ...shadows.small,
     };
-
     const sizeStyles = {
       small: {
         paddingHorizontal: spacing.sm,
@@ -49,7 +45,6 @@ export function ThemedButton({
         minHeight: 52,
       },
     };
-
     const variantStyles = {
       primary: {
         backgroundColor: colors.buttonPrimary,
@@ -58,7 +53,6 @@ export function ThemedButton({
         backgroundColor: colors.primaryAccent,
       },
       gradient: {
-        // Will be handled by LinearGradient
       },
       outline: {
         backgroundColor: 'transparent',
@@ -66,7 +60,6 @@ export function ThemedButton({
         borderColor: colors.primaryAccent,
       },
     };
-
     return {
       ...baseStyle,
       ...sizeStyles[size],
@@ -74,13 +67,11 @@ export function ThemedButton({
       opacity: disabled ? 0.6 : 1,
     };
   };
-
   const getTextStyle = (): TextStyle => {
     const baseTextStyle: TextStyle = {
       fontWeight: typography.fontWeight.medium,
       textAlign: 'center',
     };
-
     const sizeTextStyles = {
       small: {
         fontSize: typography.fontSize.sm,
@@ -92,7 +83,6 @@ export function ThemedButton({
         fontSize: typography.fontSize.lg,
       },
     };
-
     const variantTextStyles = {
       primary: {
         color: colors.textWhite,
@@ -107,14 +97,12 @@ export function ThemedButton({
         color: colors.primaryAccent,
       },
     };
-
     return {
       ...baseTextStyle,
       ...sizeTextStyles[size],
       ...variantTextStyles[variant],
     };
   };
-
   if (variant === 'gradient') {
     return (
       <TouchableOpacity
@@ -124,7 +112,7 @@ export function ThemedButton({
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={gradients.primary}
+          colors={gradients.primary as unknown as readonly [string, string, ...string[]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[getButtonStyle(), { backgroundColor: 'transparent' }]}
@@ -134,7 +122,6 @@ export function ThemedButton({
       </TouchableOpacity>
     );
   }
-
   return (
     <TouchableOpacity
       style={[getButtonStyle(), style]}

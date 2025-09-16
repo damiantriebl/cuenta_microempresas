@@ -10,7 +10,6 @@ import { TransactionEventWithRunningTotal } from '@/schemas/business-logic';
 import { formatCurrency, formatDate } from '@/schemas/business-logic';
 import { FontAwesome } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeProvider';
-
 interface TransactionCardProps {
   event: TransactionEventWithRunningTotal;
   onEdit?: () => void;
@@ -19,7 +18,6 @@ interface TransactionCardProps {
   showActions?: boolean;
   splitAmount?: number; // For split payments
 }
-
 const TransactionCard: React.FC<TransactionCardProps> = ({
   event,
   onEdit,
@@ -32,8 +30,6 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
   const isSale = event.tipo === 'venta';
   const isPayment = event.tipo === 'pago';
   const displayAmount = splitAmount || (isSale ? event.totalVenta : event.montoPago) || 0;
-
-  // Utility: compute accessible text color for a given hex background
   const getReadableTextColor = (hex?: string): string => {
     if (!hex || typeof hex !== 'string' || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
       return colors.textPrimary;
@@ -44,14 +40,10 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
     const r = parseInt(fullHex.slice(1, 3), 16) / 255;
     const g = parseInt(fullHex.slice(3, 5), 16) / 255;
     const b = parseInt(fullHex.slice(5, 7), 16) / 255;
-    // Relative luminance (WCAG)
     const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
     const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-    // Threshold tuned so that mid/dark colors use white
     return L < 0.5 ? colors.textWhite : colors.textPrimary;
   };
-
-  // Determine card background color using theme
   const getCardBackgroundColor = () => {
     if (isPayment) {
       return colors.successGreen; // Theme green for payments
@@ -61,32 +53,24 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
     }
     return colors.surfaceLight; // Theme default
   };
-
-  // Determine text color based on background
   const getTextColor = () => {
     if (isPayment) {
       return colors.textWhite; // White text on green background
     }
-    // Compute based on product color for sales
     if (isSale && event.productoColor) {
       return getReadableTextColor(event.productoColor);
     }
     return colors.textPrimary;
   };
-
-  // Get gradient overlay colors
-  const getGradientColors = () => {
+  const getGradientColors = (): readonly [string, string, ...string[]] => {
     if (isPayment) {
-      return ['rgba(255, 255, 255, 0.10)', 'rgba(0, 0, 0, 0.10)'];
+      return ['rgba(255, 255, 255, 0.10)', 'rgba(0, 0, 0, 0.10)'] as const;
     }
-    // Slight dark overlay to increase contrast on vivid product colors
-    return ['rgba(0, 0, 0, 0.08)', 'rgba(0, 0, 0, 0.12)'];
+    return ['rgba(0, 0, 0, 0.08)', 'rgba(0, 0, 0, 0.12)'] as const;
   };
-
   const backgroundColor = getCardBackgroundColor();
   const textColor = getTextColor();
   const gradientColors = getGradientColors();
-
   return (
     <View style={[
       styles.card,
@@ -96,14 +80,13 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
         ...shadows.medium,
       }
     ]}>
-      {/* Subtle gradient overlay for enhanced aesthetics */}
+      { }
       <LinearGradient
         colors={gradientColors}
         style={styles.gradientOverlay}
       />
-
       <View style={[styles.cardContent, { padding: spacing.md }]}>
-        {/* Left side - Transaction details */}
+        { }
         <View style={[styles.leftContent, { marginRight: spacing.md }]}>
           {isSale && (
             <>
@@ -142,7 +125,6 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
               </Text>
             </>
           )}
-
           {isPayment && (
             <>
               <Text style={[
@@ -169,7 +151,6 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
               </Text>
             </>
           )}
-
           <Text style={[
             styles.dateText,
             {
@@ -181,8 +162,7 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
             {formatDate(event.fecha)}
           </Text>
         </View>
-
-        {/* Right side - Running total and notes indicator */}
+        { }
         <View style={styles.rightContent}>
           <View style={styles.runningTotalContainer}>
             <Text style={[
@@ -190,7 +170,6 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
               {
                 fontSize: typography.fontSize.lg,
                 fontWeight: typography.fontWeight.bold,
-                // Ensure contrast on colored backgrounds
                 color: isPayment ? colors.textWhite : textColor,
               }
             ]}>
@@ -207,7 +186,6 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
               ]}>A favor</Text>
             )}
           </View>
-
           <View style={styles.rightBottomActions}>
             {event.notas && event.notas.trim().length > 0 && (
               <TouchableOpacity
@@ -230,7 +208,6 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
                 />
               </TouchableOpacity>
             )}
-
             {showActions && onEdit && (
               <TouchableOpacity
                 style={[
@@ -255,11 +232,9 @@ const TransactionCard: React.FC<TransactionCardProps> = ({
           </View>
         </View>
       </View>
-
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
@@ -291,19 +266,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   productName: {
-    // Styles will be applied inline using theme
   },
   paymentLabel: {
-    // Styles will be applied inline using theme
   },
   transactionDetails: {
-    // Styles will be applied inline using theme
   },
   totalAmount: {
-    // Styles will be applied inline using theme
   },
   dateText: {
-    // Styles will be applied inline using theme
   },
   runningTotalContainer: {
     alignItems: 'flex-end',
@@ -315,7 +285,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   actionIconButton: {
-    // Styles will be applied inline using theme - unified button style
   },
   actionButtons: {
     flexDirection: 'row',
@@ -332,14 +301,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   actionButtonText: {
-    // Styles will be applied inline using theme
   },
   editButton: {
-    // Additional styling for edit button if needed
   },
   deleteButton: {
-    // Additional styling for delete button if needed
   },
 });
-
 export default TransactionCard;

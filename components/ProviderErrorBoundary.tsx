@@ -1,28 +1,20 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ProviderChainVerifier, ProviderStatus } from '@/services/ProviderChainVerifier';
-
 interface Props {
   children: ReactNode;
   providerName: string;
   fallbackComponent?: React.ComponentType<{ children: ReactNode }>;
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
-
 interface State {
   hasError: boolean;
   error: Error | null;
   providerStatus: ProviderStatus | null;
   recoveryAttempts: number;
 }
-
-/**
- * Error boundary specifically designed for provider components
- * Provides automatic recovery and fallback mechanisms for provider failures
- */
 export class ProviderErrorBoundary extends Component<Props, State> {
   private verifier: ProviderChainVerifier;
-
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -33,31 +25,22 @@ export class ProviderErrorBoundary extends Component<Props, State> {
     };
     this.verifier = ProviderChainVerifier.getInstance();
   }
-
   static getDerivedStateFromError(error: Error): Partial<State> {
     return {
       hasError: true,
       error
     };
   }
-
   async componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error(`Provider Error in ${this.props.providerName}:`, error);
     console.error('Error Info:', errorInfo);
-
-    // Call custom error handler if provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-
-    // Verify the specific provider that failed
     try {
       const report = await this.verifier.verifyProviderChain();
-      const providerStatus = report.providers.find(p => p.name === this.props.providerName);
-      
+      const providerStatus = report.providers.find(p => p.name === this.props.providerName) || null;
       this.setState({ providerStatus });
-
-      // Attempt automatic recovery if this is the first error
       if (this.state.recoveryAttempts === 0) {
         this.attemptRecovery();
       }
@@ -65,24 +48,17 @@ export class ProviderErrorBoundary extends Component<Props, State> {
       console.error('Provider verification failed:', verificationError);
     }
   }
-
   private attemptRecovery = async () => {
     const { providerName } = this.props;
     const { recoveryAttempts } = this.state;
-
     if (recoveryAttempts >= 3) {
       console.warn(`Max recovery attempts reached for ${providerName}`);
       return;
     }
-
     this.setState({ recoveryAttempts: recoveryAttempts + 1 });
-
     try {
       const recoverySuccess = await this.verifier.attemptProviderRecovery(providerName);
-      
       if (recoverySuccess) {
-        console.log(`Recovery successful for ${providerName}`);
-        // Reset error state to retry rendering
         this.setState({
           hasError: false,
           error: null,
@@ -95,7 +71,6 @@ export class ProviderErrorBoundary extends Component<Props, State> {
       console.error(`Recovery attempt failed for ${providerName}:`, recoveryError);
     }
   };
-
   private handleManualRetry = () => {
     this.setState({
       hasError: false,
@@ -104,12 +79,9 @@ export class ProviderErrorBoundary extends Component<Props, State> {
       recoveryAttempts: 0
     });
   };
-
   private renderFallback() {
     const { providerName, fallbackComponent: FallbackComponent } = this.props;
     const { error, providerStatus, recoveryAttempts } = this.state;
-
-    // If a fallback component is provided, use it
     if (FallbackComponent) {
       return (
         <FallbackComponent>
@@ -117,19 +89,15 @@ export class ProviderErrorBoundary extends Component<Props, State> {
         </FallbackComponent>
       );
     }
-
-    // Default fallback UI
     return (
       <View style={styles.errorContainer}>
         <View style={styles.errorContent}>
           <Text style={styles.errorTitle}>
             Provider Error: {providerName}
           </Text>
-          
           <Text style={styles.errorMessage}>
             {error?.message || 'Unknown provider error'}
           </Text>
-
           {providerStatus && (
             <View style={styles.statusContainer}>
               <Text style={styles.statusTitle}>Provider Status:</Text>
@@ -137,11 +105,10 @@ export class ProviderErrorBoundary extends Component<Props, State> {
                 styles.statusText,
                 { color: this.getStatusColor(providerStatus.status) }
               ]}>
-                {providerStatus.status.toUpperCase()}: {providerStatus.message}
+                {providerStatus.status.toUpperCase()}
               </Text>
             </View>
           )}
-
           <View style={styles.actionContainer}>
             <TouchableOpacity
               style={styles.retryButton}
@@ -152,7 +119,6 @@ export class ProviderErrorBoundary extends Component<Props, State> {
                 {recoveryAttempts >= 3 ? 'Max Retries Reached' : `Retry (${recoveryAttempts}/3)`}
               </Text>
             </TouchableOpacity>
-
             {recoveryAttempts < 3 && (
               <TouchableOpacity
                 style={styles.autoRecoveryButton}
@@ -164,7 +130,6 @@ export class ProviderErrorBoundary extends Component<Props, State> {
               </TouchableOpacity>
             )}
           </View>
-
           {__DEV__ && (
             <View style={styles.debugContainer}>
               <Text style={styles.debugTitle}>Debug Info:</Text>
@@ -183,12 +148,9 @@ export class ProviderErrorBoundary extends Component<Props, State> {
       </View>
     );
   }
-
   private renderErrorInfo() {
     const { error, providerStatus } = this.state;
-    
     if (!__DEV__) return null;
-
     return (
       <View style={styles.errorInfo}>
         <Text style={styles.errorInfoText}>
@@ -196,13 +158,12 @@ export class ProviderErrorBoundary extends Component<Props, State> {
         </Text>
         {providerStatus && (
           <Text style={styles.errorInfoText}>
-            Status: {providerStatus.status} - {providerStatus.message}
+            Status: {providerStatus.status}
           </Text>
         )}
       </View>
     );
   }
-
   private getStatusColor(status: string): string {
     switch (status) {
       case 'healthy': return '#28a745';
@@ -211,16 +172,13 @@ export class ProviderErrorBoundary extends Component<Props, State> {
       default: return '#6c757d';
     }
   }
-
   render() {
     if (this.state.hasError) {
       return this.renderFallback();
     }
-
     return this.props.children;
   }
 }
-
 const styles = StyleSheet.create({
   errorContainer: {
     flex: 1,
@@ -334,5 +292,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
 export default ProviderErrorBoundary;

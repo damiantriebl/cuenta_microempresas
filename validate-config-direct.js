@@ -1,16 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔍 Direct validation of app configuration...\n');
+console.log('🔍 Validación directa de configuración de app...\n');
 
-// Read the file content directly
+
 const configPath = './app.config.js';
 const configContent = fs.readFileSync(configPath, 'utf8');
 
-console.log('✅ File read successfully');
-console.log('📄 File size:', configContent.length, 'characters');
+console.log('✅ Archivo leído exitosamente');
+console.log('📄 Tamaño del archivo:', configContent.length, 'caracteres');
 
-// Check for key configuration elements
+
 const hasName = configContent.includes('"Cuenta Microempresas');
 const hasSlug = configContent.includes('"cuenta-microempresas"');
 const hasPackage = configContent.includes('"com.ukn.cuentamicroempresas"');
@@ -18,22 +18,22 @@ const hasEASProject = configContent.includes('3dc127bf-00d4-4447-a8ea-eaaeae7a62
 const hasNotificationPlugin = configContent.includes('expo-notifications');
 const hasNotificationColor = configContent.includes('#20B2AA');
 
-console.log('✅ App name found:', hasName);
-console.log('✅ Slug found:', hasSlug);
-console.log('✅ Package name found:', hasPackage);
-console.log('✅ EAS project ID found:', hasEASProject);
-console.log('✅ Notification plugin found:', hasNotificationPlugin);
-console.log('✅ Notification color found:', hasNotificationColor);
+console.log('✅ Nombre de app encontrado:', hasName);
+console.log('✅ Slug encontrado:', hasSlug);
+console.log('✅ Nombre de paquete encontrado:', hasPackage);
+console.log('✅ ID de proyecto EAS encontrado:', hasEASProject);
+console.log('✅ Plugin de notificaciones encontrado:', hasNotificationPlugin);
+console.log('✅ Color de notificación encontrado:', hasNotificationColor);
 
 if (hasName && hasSlug && hasPackage && hasEASProject && hasNotificationPlugin && hasNotificationColor) {
-  console.log('\n🎉 All configuration elements are present in the file!');
-  console.log('\n📋 Configuration Summary:');
-  console.log('   • App Name: Cuenta Microempresas - Gestión de Ventas');
+  console.log('\n🎉 Todos los elementos de configuración están presentes en el archivo!');
+  console.log('\n📋 Resumen de Configuración:');
+  console.log('   • Nombre de App: Cuenta Microempresas - Gestión de Ventas');
   console.log('   • Slug: cuenta-microempresas');
-  console.log('   • Package: com.ukn.cuentamicroempresas');
-  console.log('   • EAS Project: 3dc127bf-00d4-4447-a8ea-eaaeae7a6276');
-  console.log('   • Notification Color: #20B2AA');
+  console.log('   • Paquete: com.ukn.cuentamicroempresas');
+  console.log('   • Proyecto EAS: 3dc127bf-00d4-4447-a8ea-eaaeae7a6276');
+  console.log('   • Color de Notificación: #20B2AA');
 } else {
-  console.log('\n❌ Some configuration elements are missing');
+  console.log('\n❌ Faltan algunos elementos de configuración');
   process.exit(1);
 }

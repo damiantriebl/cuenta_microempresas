@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Platform, View, Modal, Button, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { SketchPicker } from 'react-color'; // Para la web
-import { ColorPicker } from 'react-native-color-picker'; // Para móviles
-
+import { SketchPicker, ColorResult } from 'react-color'; // Para la web
 export default function MultiplatformColorPicker({
     onColorChange,
 }: {
@@ -10,29 +8,24 @@ export default function MultiplatformColorPicker({
 }) {
     const [currentColor, setCurrentColor] = useState('#808080');
     const [colorPickerVisible, setColorPickerVisible] = useState(false);
-
     const handleColorChange = (color: string) => {
         setCurrentColor(color);
         onColorChange(color);
     };
-
     return (
         <View style={styles.container}>
-            {/* Botón para abrir el selector de color */}
             <TouchableOpacity
                 style={[styles.colorPreview, { backgroundColor: currentColor }]}
                 onPress={() => setColorPickerVisible(true)}
             >
                 <Text style={styles.colorText}>Seleccionar Color</Text>
             </TouchableOpacity>
-
             {Platform.OS === 'web' ? (
-                // Para web, usamos react-color
                 colorPickerVisible && (
                     <View style={styles.webPickerContainer}>
                         <SketchPicker
                             color={currentColor}
-                            onChangeComplete={(color) => {
+                            onChangeComplete={(color: ColorResult) => {
                                 handleColorChange(color.hex);
                                 setColorPickerVisible(false);
                             }}
@@ -40,24 +33,30 @@ export default function MultiplatformColorPicker({
                     </View>
                 )
             ) : (
-                // Para móviles (Android/iOS), usamos react-native-color-picker
                 <Modal visible={colorPickerVisible} transparent animationType="slide">
                     <View style={styles.modalContainer}>
-                        <ColorPicker
-                            onColorSelected={(color) => {
-                                handleColorChange(color);
-                                setColorPickerVisible(false);
-                            }}
-                            style={styles.nativePicker}
-                        />
-                        <Button title="Cerrar" onPress={() => setColorPickerVisible(false)} />
+                        <View style={styles.nativePicker}>
+                            <Text style={styles.pickerTitle}>Seleccionar Color</Text>
+                            <View style={styles.colorOptions}>
+                                {['#FF5733', '#33FF57', '#3357FF', '#F1C40F', '#E74C3C', '#9B59B6', '#1ABC9C', '#34495E'].map((color) => (
+                                    <TouchableOpacity
+                                        key={color}
+                                        style={[styles.colorOption, { backgroundColor: color }]}
+                                        onPress={() => {
+                                            handleColorChange(color);
+                                            setColorPickerVisible(false);
+                                        }}
+                                    />
+                                ))}
+                            </View>
+                            <Button title="Cerrar" onPress={() => setColorPickerVisible(false)} />
+                        </View>
                     </View>
                 </Modal>
             )}
         </View>
     );
 }
-
 const styles = StyleSheet.create({
     container: {
         margin: 10,
@@ -83,7 +82,29 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     nativePicker: {
-        width: 300,
-        height: 300,
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 20,
+        margin: 20,
+    },
+    pickerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 15,
+    },
+    colorOptions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        marginBottom: 15,
+    },
+    colorOption: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        margin: 5,
+        borderWidth: 2,
+        borderColor: '#ddd',
     },
 });

@@ -1,9 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-
-// Safe fallback contexts with minimal functionality
-
-// Fallback Auth Context
 interface FallbackAuthContextType {
   user: null;
   loading: boolean;
@@ -15,7 +11,6 @@ interface FallbackAuthContextType {
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOutApp: () => Promise<void>;
 }
-
 const FallbackAuthContext = createContext<FallbackAuthContextType>({
   user: null,
   loading: false,
@@ -33,10 +28,9 @@ const FallbackAuthContext = createContext<FallbackAuthContextType>({
     throw new Error('Auth service unavailable - using fallback provider'); 
   }
 });
-
 export const FallbackAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
-    <FallbackAuthContext.Provider value={FallbackAuthContext._currentValue}>
+    <FallbackAuthContext.Provider value={{  user: null, loading: false, empresaId: null, setEmpresaId: () => {}, empresas: [], refreshEmpresas: async () => {}, signInWithEmail: async () => { throw new Error('Auth service unavailable - using fallback provider'); }, signUpWithEmail: async () => { throw new Error('Auth service unavailable - using fallback provider'); }, signOutApp: async () => { throw new Error('Auth service unavailable - using fallback provider'); } }}>
       <View style={styles.fallbackContainer}>
         {children}
         <FallbackIndicator providerName="Auth" />
@@ -44,8 +38,6 @@ export const FallbackAuthProvider: React.FC<{ children: ReactNode }> = ({ childr
     </FallbackAuthContext.Provider>
   );
 };
-
-// Fallback Theme Context
 interface FallbackThemeContextType {
   colors: {
     primary: string;
@@ -67,7 +59,6 @@ interface FallbackThemeContextType {
   };
   shadows: {};
 }
-
 const fallbackTheme: FallbackThemeContextType = {
   colors: {
     primary: '#007AFF',
@@ -89,9 +80,7 @@ const fallbackTheme: FallbackThemeContextType = {
   },
   shadows: {}
 };
-
 const FallbackThemeContext = createContext<FallbackThemeContextType>(fallbackTheme);
-
 export const FallbackThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <FallbackThemeContext.Provider value={fallbackTheme}>
@@ -102,23 +91,19 @@ export const FallbackThemeProvider: React.FC<{ children: ReactNode }> = ({ child
     </FallbackThemeContext.Provider>
   );
 };
-
-// Fallback Toast Context
 interface FallbackToastContextType {
   showToast: (message: string, type: string, action?: any) => void;
   hideToast: () => void;
 }
-
 const FallbackToastContext = createContext<FallbackToastContextType>({
   showToast: (message: string) => {
     console.warn(`Toast unavailable - Message: ${message}`);
   },
   hideToast: () => {}
 });
-
 export const FallbackToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
-    <FallbackToastContext.Provider value={FallbackToastContext._currentValue}>
+    <FallbackToastContext.Provider value={{ showToast: (message: string) => { console.warn(`Toast unavailable - Message: ${message}`); }, hideToast: () => {} }}>
       <View style={styles.fallbackContainer}>
         {children}
         <FallbackIndicator providerName="Toast" />
@@ -126,8 +111,6 @@ export const FallbackToastProvider: React.FC<{ children: ReactNode }> = ({ child
     </FallbackToastContext.Provider>
   );
 };
-
-// Fallback RealtimeData Context
 interface FallbackRealtimeDataContextType {
   products: [];
   productsLoading: boolean;
@@ -149,7 +132,6 @@ interface FallbackRealtimeDataContextType {
   refreshEvents: () => void;
   refreshAll: () => void;
 }
-
 const fallbackRealtimeData: FallbackRealtimeDataContextType = {
   products: [],
   productsLoading: false,
@@ -171,9 +153,7 @@ const fallbackRealtimeData: FallbackRealtimeDataContextType = {
   refreshEvents: () => console.warn('RealtimeData service unavailable'),
   refreshAll: () => console.warn('RealtimeData service unavailable')
 };
-
 const FallbackRealtimeDataContext = createContext<FallbackRealtimeDataContextType>(fallbackRealtimeData);
-
 export const FallbackRealtimeDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <FallbackRealtimeDataContext.Provider value={fallbackRealtimeData}>
@@ -184,24 +164,19 @@ export const FallbackRealtimeDataProvider: React.FC<{ children: ReactNode }> = (
     </FallbackRealtimeDataContext.Provider>
   );
 };
-
-// Fallback ClientSelection Context
 interface FallbackClientSelectionContextType {
   selectedClient: null;
   selectClient: (client: any) => void;
   clearSelection: () => void;
   isClientSelected: boolean;
 }
-
 const fallbackClientSelection: FallbackClientSelectionContextType = {
   selectedClient: null,
   selectClient: () => console.warn('ClientSelection service unavailable'),
   clearSelection: () => {},
   isClientSelected: false
 };
-
 const FallbackClientSelectionContext = createContext<FallbackClientSelectionContextType>(fallbackClientSelection);
-
 export const FallbackClientSelectionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <FallbackClientSelectionContext.Provider value={fallbackClientSelection}>
@@ -212,11 +187,8 @@ export const FallbackClientSelectionProvider: React.FC<{ children: ReactNode }> 
     </FallbackClientSelectionContext.Provider>
   );
 };
-
-// Fallback indicator component
 const FallbackIndicator: React.FC<{ providerName: string }> = ({ providerName }) => {
   if (!__DEV__) return null;
-
   return (
     <View style={styles.indicator}>
       <Text style={styles.indicatorText}>
@@ -225,14 +197,11 @@ const FallbackIndicator: React.FC<{ providerName: string }> = ({ providerName })
     </View>
   );
 };
-
-// Hooks for fallback contexts
 export const useFallbackAuth = () => useContext(FallbackAuthContext);
 export const useFallbackTheme = () => useContext(FallbackThemeContext);
 export const useFallbackToast = () => useContext(FallbackToastContext);
 export const useFallbackRealtimeData = () => useContext(FallbackRealtimeDataContext);
 export const useFallbackClientSelection = () => useContext(FallbackClientSelectionContext);
-
 const styles = StyleSheet.create({
   fallbackContainer: {
     flex: 1,
@@ -255,8 +224,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-// Provider factory for creating safe providers
 export class SafeProviderFactory {
   static createSafeProvider<T extends React.ComponentType<any>>(
     OriginalProvider: T,
@@ -274,7 +241,6 @@ export class SafeProviderFactory {
       );
     };
   }
-
   static getAllFallbackProviders() {
     return {
       FallbackAuthProvider,
@@ -285,8 +251,5 @@ export class SafeProviderFactory {
     };
   }
 }
-
-// Import ProviderErrorBoundary to avoid circular dependency
 import ProviderErrorBoundary from './ProviderErrorBoundary';
-
 export default SafeProviderFactory;

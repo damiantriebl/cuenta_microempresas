@@ -1,4 +1,3 @@
-// @ts-ignore
 import React, { useEffect, useState } from 'react';
 import {
     View,
@@ -15,11 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useConnectionStatus } from '@/context/RealtimeDataProvider';
 import OfflineDataManager from '@/services/OfflineDataManager';
 import { useAuth } from '@/context/AuthProvider';
-
 interface OfflineStatusBarProps {
     visible?: boolean;
 }
-
 interface OfflineStats {
     cacheSize: number;
     queueLength: number;
@@ -36,7 +33,6 @@ interface OfflineStats {
     };
     pendingByType: Record<string, number>;
 }
-
 export default function OfflineStatusBar({ visible = true }: OfflineStatusBarProps) {
     const { isConnected, lastSyncTime } = useConnectionStatus();
     const { empresaId } = useAuth();
@@ -48,14 +44,11 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
     const [offlineStats, setOfflineStats] = useState<OfflineStats | null>(null);
     const [failedItemsCount, setFailedItemsCount] = useState(0);
     const [autoHideTimeout, setAutoHideTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
-
     const offlineManager = OfflineDataManager.getInstance();
-
     useEffect(() => {
         const updateSyncInfo = async () => {
             setSyncQueueLength(offlineManager.getSyncQueueLength());
             setIsSyncing(offlineManager.isSyncInProgress());
-
             if (empresaId) {
                 try {
                     const stats = await offlineManager.getOfflineStats(empresaId);
@@ -66,13 +59,10 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                 }
             }
         };
-
         updateSyncInfo();
         const interval = setInterval(updateSyncInfo, 2000);
-
         return () => clearInterval(interval);
     }, [empresaId]);
-
     useEffect(() => {
         return () => {
             if (autoHideTimeout) {
@@ -80,22 +70,18 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
             }
         };
     }, [autoHideTimeout]);
-
     useEffect(() => {
         if (autoHideTimeout) {
             clearTimeout(autoHideTimeout);
         }
-
         const hasIssues = syncQueueLength > 0 || isSyncing || failedItemsCount > 0 || !isConnected;
         const shouldShow = visible && (hasIssues || isConnected);
-
         if (shouldShow) {
             Animated.timing(slideAnim, {
                 toValue: 0,
                 duration: 300,
                 useNativeDriver: true,
             }).start();
-
             if (isConnected && !hasIssues) {
                 const timeout = setTimeout(() => {
                     Animated.timing(slideAnim, {
@@ -114,21 +100,17 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
             }).start();
         }
     }, [isConnected, syncQueueLength, isSyncing, visible, slideAnim, failedItemsCount]);
-
     const handleRetrySync = async () => {
         if (isConnected) {
             try {
                 const result = await offlineManager.processSyncQueue();
-                console.log('Manual sync completed:', result);
             } catch (error) {
                 console.error('Manual sync failed:', error);
             }
         }
     };
-
     const handleRetryFailedItems = async () => {
         if (!offlineStats) return;
-
         try {
             const failedItems = await offlineManager.getFailedItems();
             for (const item of failedItems) {
@@ -138,27 +120,21 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
             console.error('Error retrying failed items:', error);
         }
     };
-
     const getStatusText = () => {
         if (!isConnected) {
             return 'Sin conexión - Trabajando offline';
         }
-
         if (isSyncing) {
             return 'Sincronizando datos...';
         }
-
         if (failedItemsCount > 0) {
             return `${failedItemsCount} elemento${failedItemsCount > 1 ? 's' : ''} fallido${failedItemsCount > 1 ? 's' : ''}`;
         }
-
         if (syncQueueLength > 0) {
             return `${syncQueueLength} cambio${syncQueueLength > 1 ? 's' : ''} pendiente${syncQueueLength > 1 ? 's' : ''}`;
         }
-
         return 'Datos sincronizados';
     };
-
     const getStatusColor = () => {
         if (!isConnected) return '#dc3545';
         if (failedItemsCount > 0) return '#dc3545';
@@ -166,7 +142,6 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
         if (syncQueueLength > 0) return '#fd7e14';
         return '#28a745';
     };
-
     const getStatusIcon = () => {
         if (!isConnected) return 'cloud-offline-outline';
         if (failedItemsCount > 0) return 'warning-outline';
@@ -174,23 +149,17 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
         if (syncQueueLength > 0) return 'cloud-upload-outline';
         return 'cloud-done-outline';
     };
-
     const formatLastSync = () => {
         if (!lastSyncTime) return 'Nunca';
-
         const now = new Date();
         const diff = now.getTime() - lastSyncTime.getTime();
         const minutes = Math.floor(diff / 60000);
-
         if (minutes < 1) return 'Hace un momento';
         if (minutes < 60) return `Hace ${minutes} min`;
-
         const hours = Math.floor(minutes / 60);
         if (hours < 24) return `Hace ${hours}h`;
-
         return lastSyncTime.toLocaleDateString();
     };
-
     const renderStatusBar = () => (
         <Animated.View
             style={[
@@ -221,14 +190,12 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                     )}
                     <Text style={styles.statusText}>{getStatusText()}</Text>
                 </View>
-
                 <View style={styles.rightSection}>
                     {lastSyncTime && (
                         <Text style={styles.lastSyncText}>
                             Última sync: {formatLastSync()}
                         </Text>
                     )}
-
                     {(syncQueueLength > 0 || failedItemsCount > 0) && (
                         <TouchableOpacity
                             style={styles.retryButton}
@@ -238,13 +205,11 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                             <Ionicons name="refresh" size={14} color="#fff" />
                         </TouchableOpacity>
                     )}
-
                     <Ionicons name="chevron-forward" size={14} color="#fff" style={{ opacity: 0.7 }} />
                 </View>
             </TouchableOpacity>
         </Animated.View>
     );
-
     const renderModal = () => (
         <Modal
             visible={showDetails}
@@ -262,11 +227,10 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                         <Ionicons name="close" size={24} color="#333" />
                     </TouchableOpacity>
                 </View>
-
                 <ScrollView style={styles.modalContent}>
                     {offlineStats && (
                         <>
-                            {/* Connection Status */}
+                            {}
                             <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>Estado de Conexión</Text>
                                 <View style={styles.statusRow}>
@@ -280,8 +244,7 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                                     </Text>
                                 </View>
                             </View>
-
-                            {/* Sync Queue Status */}
+                            {}
                             <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>Cola de Sincronización</Text>
                                 <View style={styles.statsGrid}>
@@ -299,8 +262,7 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                                     </View>
                                 </View>
                             </View>
-
-                            {/* Pending Items by Type */}
+                            {}
                             {Object.keys(offlineStats.pendingByType).length > 0 && (
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>Elementos Pendientes por Tipo</Text>
@@ -321,8 +283,7 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                                     )}
                                 </View>
                             )}
-
-                            {/* Cache Information */}
+                            {}
                             <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>Información de Caché</Text>
                                 <View style={styles.infoRow}>
@@ -332,8 +293,7 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                                     </Text>
                                 </View>
                             </View>
-
-                            {/* Action Buttons */}
+                            {}
                             <View style={styles.actionSection}>
                                 {syncQueueLength > 0 && (
                                     <TouchableOpacity
@@ -347,7 +307,6 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
                                         </Text>
                                     </TouchableOpacity>
                                 )}
-
                                 {failedItemsCount > 0 && (
                                     <TouchableOpacity
                                         style={[styles.actionButton, { backgroundColor: '#dc3545' }]}
@@ -365,7 +324,6 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
             </View>
         </Modal>
     );
-
     return (
         <>
             {renderStatusBar()}
@@ -373,7 +331,6 @@ export default function OfflineStatusBar({ visible = true }: OfflineStatusBarPro
         </>
     );
 }
-
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',

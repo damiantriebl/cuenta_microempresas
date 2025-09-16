@@ -1,794 +1,1 @@
-import React, { useState, useEffect } from 'react';
-import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    Modal,
-    StyleSheet,
-    Alert,
-    ScrollView,
-    KeyboardAvoidingView,
-    Platform,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Timestamp } from 'firebase/firestore';
-import DatePickerModule from '@/components/DatePicker';
-import ProductSelector from '@/components/ProductSelector';
-import {
-    Product,
-    TransactionEvent,
-    SaleEvent,
-    PaymentEvent,
-    CreateProductData,
-    UpdateTransactionEventData
-} from '@/schemas/types';
-import {
-    calculateSaleTotal
-} from '@/schemas/event-utils';
-import { isSaleEvent, isPaymentEvent } from '@/schemas/types';
-
-interface TransactionEditModalProps {
-    visible: boolean;
-    onClose: () => void;
-    event: TransactionEvent | null;
-    clienteName: string;
-    onUpdateTransaction: (eventId: string, updateData: UpdateTransactionEventData) => Promise<void>;
-    onDeleteTransaction: (eventId: string) => Promise<void>;
-    onCreateProduct?: (productData: CreateProductData) => Promise<Product | null>;
-    isLoading?: boolean;
-}
-
-export default function TransactionEditModal({
-    visible,
-    onClose,
-    event,
-    clienteName,
-    onUpdateTransaction,
-    onDeleteTransaction,
-    onCreateProduct,
-    isLoading = false
-}: TransactionEditModalProps) {
-    // Modal states
-    const [showProductSelector, setShowProductSelector] = useState(false);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-    // Sale form state
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [cantidad, setCantidad] = useState('');
-    const [costoUnitario, setCostoUnitario] = useState('');
-    const [gananciaUnitaria, setGananciaUnitaria] = useState('');
-    const [saleDate, setSaleDate] = useState(new Date());
-    const [saleNotas, setSaleNotas] = useState('');
-
-    // Payment form state
-    const [montoPago, setMontoPago] = useState('');
-    const [paymentDate, setPaymentDate] = useState(new Date());
-    const [paymentNotas, setPaymentNotas] = useState('');
-
-    // UI state
-    const [errors, setErrors] = useState<string[]>([]);
-
-    const initializeForm = (transactionEvent: TransactionEvent) => {
-        setErrors([]);
-
-        if (isSaleEvent(transactionEvent)) {
-            // Initialize sale form
-            const saleEvent = transactionEvent as SaleEvent;
-
-            // Create a mock product object for display
-            setSelectedProduct({
-                id: 'temp-' + Date.now(),
-                nombre: saleEvent.producto,
-                colorFondo: saleEvent.productoColor || '#f0f0f0',
-                posicion: 0,
-                activo: true,
-                creado: Timestamp.now(),
-                ultimoCosto: saleEvent.costoUnitario,
-                ultimaGanancia: saleEvent.gananciaUnitaria
-            });
-
-            setCantidad(saleEvent.cantidad.toString());
-            setCostoUnitario(saleEvent.costoUnitario.toString());
-            setGananciaUnitaria(saleEvent.gananciaUnitaria.toString());
-            setSaleDate(saleEvent.fecha.toDate());
-            setSaleNotas(saleEvent.notas || '');
-
-            // Reset payment form
-            setMontoPago('');
-            setPaymentDate(new Date());
-            setPaymentNotas('');
-        } else if (isPaymentEvent(transactionEvent)) {
-            // Initialize payment form
-            const paymentEvent = transactionEvent as PaymentEvent;
-
-            setMontoPago(paymentEvent.montoPago.toString());
-            setPaymentDate(paymentEvent.fecha.toDate());
-            setPaymentNotas(paymentEvent.notas || '');
-
-            // Reset sale form
-            setSelectedProduct(null);
-            setCantidad('');
-            setCostoUnitario('');
-            setGananciaUnitaria('');
-            setSaleDate(new Date());
-            setSaleNotas('');
-        }
-    };
-
-    // Initialize form when event changes - MUST be before any conditional returns
-    useEffect(() => {
-        if (event && visible) {
-            initializeForm(event);
-        }
-    }, [event, visible]);
-
-    // Guard clause
-    if (!event) {
-        return null;
-    }
-
-    const isSale = isSaleEvent(event);
-
-    const handleProductSelect = (product: Product, cachedPrices: { ultimoCosto?: number; ultimaGanancia?: number }) => {
-        setSelectedProduct(product);
-
-        // Auto-fill with cached prices if available and current fields are empty
-        if (cachedPrices.ultimoCosto !== undefined && !costoUnitario) {
-            setCostoUnitario(cachedPrices.ultimoCosto.toString());
-        }
-        if (cachedPrices.ultimaGanancia !== undefined && !gananciaUnitaria) {
-            setGananciaUnitaria(cachedPrices.ultimaGanancia.toString());
-        }
-
-        setShowProductSelector(false);
-    };
-
-    const parseLocaleNumber = (value: string): number => {
-        if (!value) return NaN;
-        let sanitized = value.replace(/\s+/g, '');
-        if (sanitized.includes(',') && sanitized.includes('.')) {
-            sanitized = sanitized.replace(/\./g, '').replace(',', '.');
-        } else if (sanitized.includes(',')) {
-            sanitized = sanitized.replace(',', '.');
-        }
-        sanitized = sanitized.replace(/[^0-9.\-]/g, '');
-        return Number(sanitized);
-    };
-
-    const calculateTotal = (): number => {
-        const qty = parseLocaleNumber(cantidad) || 0;
-        const costo = parseLocaleNumber(costoUnitario) || 0;
-        const ganancia = parseLocaleNumber(gananciaUnitaria) || 0;
-        return calculateSaleTotal(qty, costo, ganancia);
-    };
-
-    const validateSaleForm = (): boolean => {
-        const newErrors: string[] = [];
-
-        if (!selectedProduct) {
-            newErrors.push('Selecciona un producto');
-        }
-
-        if (!cantidad || parseLocaleNumber(cantidad) <= 0) {
-            newErrors.push('La cantidad debe ser mayor a 0');
-        }
-
-        if (!costoUnitario || parseLocaleNumber(costoUnitario) < 0) {
-            newErrors.push('El costo unitario debe ser mayor o igual a 0');
-        }
-
-        if (!gananciaUnitaria || parseLocaleNumber(gananciaUnitaria) < 0) {
-            newErrors.push('La ganancia unitaria debe ser mayor o igual a 0');
-        }
-
-        if (saleNotas && saleNotas.length > 500) {
-            newErrors.push('Las notas no pueden exceder 500 caracteres');
-        }
-
-        setErrors(newErrors);
-        return newErrors.length === 0;
-    };
-
-    const validatePaymentForm = (): boolean => {
-        const newErrors: string[] = [];
-
-        const parsedMonto = parseLocaleNumber(montoPago);
-        if (!montoPago || isNaN(parsedMonto) || parsedMonto <= 0) {
-            newErrors.push('El monto del pago debe ser mayor a 0');
-        }
-
-        if (paymentNotas && paymentNotas.length > 500) {
-            newErrors.push('Las notas no pueden exceder 500 caracteres');
-        }
-
-        setErrors(newErrors);
-        return newErrors.length === 0;
-    };
-
-    const handleSaleUpdate = async () => {
-        if (!validateSaleForm() || !selectedProduct || !event) {
-            return;
-        }
-
-        try {
-            const parsedCantidad = parseLocaleNumber(cantidad);
-            const parsedCosto = parseLocaleNumber(costoUnitario);
-            const parsedGanancia = parseLocaleNumber(gananciaUnitaria);
-
-            const updateData: any = {
-                producto: selectedProduct.nombre,
-                productoColor: selectedProduct.colorFondo,
-                cantidad: parsedCantidad,
-                costoUnitario: parsedCosto,
-                gananciaUnitaria: parsedGanancia,
-                totalVenta: calculateSaleTotal(parsedCantidad, parsedCosto, parsedGanancia),
-                fecha: Timestamp.fromDate(saleDate),
-                notas: (saleNotas ?? '').trim(),
-            };
-
-            await onUpdateTransaction(event.id, updateData);
-            onClose();
-        } catch (error) {
-            console.error('Error updating sale:', error);
-            Alert.alert('Error', 'No se pudo actualizar la venta');
-        }
-    };
-
-    const handlePaymentUpdate = async () => {
-        if (!validatePaymentForm() || !event) {
-            return;
-        }
-
-        try {
-            const updateData: any = {
-                montoPago: parseLocaleNumber(montoPago),
-                fecha: Timestamp.fromDate(paymentDate),
-                notas: (paymentNotas ?? '').trim(),
-            };
-
-            await onUpdateTransaction(event.id, updateData);
-            onClose();
-        } catch (error) {
-            console.error('Error updating payment:', error);
-            Alert.alert('Error', 'No se pudo actualizar el pago');
-        }
-    };
-
-    const handleDelete = () => {
-        setShowDeleteConfirm(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!event) return;
-
-        try {
-            await onDeleteTransaction(event.id);
-            setShowDeleteConfirm(false);
-            onClose();
-        } catch (error) {
-            console.error('Error deleting transaction:', error);
-            Alert.alert('Error', 'No se pudo eliminar la transacción');
-        }
-    };
-
-    const renderSaleForm = () => (
-        <ScrollView
-            style={styles.formContainer}
-            contentContainerStyle={styles.formContentSpacer}
-            showsVerticalScrollIndicator={false}
-        >
-            {/* Product Selection */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Producto *</Text>
-                <TouchableOpacity
-                    style={[
-                        styles.productSelector,
-                        selectedProduct && { backgroundColor: selectedProduct.colorFondo }
-                    ]}
-                    onPress={() => setShowProductSelector(true)}
-                >
-                    {selectedProduct ? (
-                        <Text style={styles.selectedProductText}>{selectedProduct.nombre}</Text>
-                    ) : (
-                        <Text style={styles.placeholderText}>Seleccionar producto</Text>
-                    )}
-                    <Ionicons name="chevron-down" size={20} color={selectedProduct ? "#fff" : "#666"} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Quantity */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Cantidad *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={cantidad}
-                    onChangeText={setCantidad}
-                    placeholder="1"
-                    keyboardType="numeric"
-                />
-            </View>
-
-            {/* Price Fields */}
-            <View style={styles.priceRow}>
-                <View style={[styles.fieldContainer, styles.halfWidth]}>
-                    <Text style={styles.label}>Costo Unitario *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={costoUnitario}
-                        onChangeText={setCostoUnitario}
-                        placeholder="0.00"
-                        keyboardType="numeric"
-                    />
-                </View>
-
-                <View style={[styles.fieldContainer, styles.halfWidth]}>
-                    <Text style={styles.label}>Ganancia Unitaria *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={gananciaUnitaria}
-                        onChangeText={setGananciaUnitaria}
-                        placeholder="0.00"
-                        keyboardType="numeric"
-                    />
-                </View>
-            </View>
-
-            {/* Total Calculation */}
-            {costoUnitario && gananciaUnitaria && cantidad && (
-                <View style={styles.totalContainer}>
-                    <Text style={styles.totalLabel}>Total de Venta:</Text>
-                    <Text style={styles.totalAmount}>
-                        {cantidad} × ({costoUnitario} + {gananciaUnitaria}) = ${calculateTotal().toFixed(2)}
-                    </Text>
-                </View>
-            )}
-
-            {/* Date */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Fecha</Text>
-                <View style={styles.dateContainer}>
-                    <DatePickerModule
-                        value={saleDate}
-                        onChange={setSaleDate}
-                    />
-                </View>
-            </View>
-
-            {/* Notes */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Notas (Opcional)</Text>
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    value={saleNotas}
-                    onChangeText={setSaleNotas}
-                    placeholder="Notas adicionales sobre la venta"
-                    multiline
-                    numberOfLines={3}
-                    maxLength={500}
-                />
-                <Text style={styles.characterCount}>
-                    {saleNotas.length}/500 caracteres
-                </Text>
-            </View>
-        </ScrollView>
-    );
-
-    const renderPaymentForm = () => (
-        <ScrollView
-            style={styles.formContainer}
-            contentContainerStyle={styles.formContentSpacer}
-            showsVerticalScrollIndicator={false}
-        >
-            {/* Payment Amount */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Monto del Pago *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={montoPago}
-                    onChangeText={setMontoPago}
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                />
-            </View>
-
-            {/* Date */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Fecha</Text>
-                <View style={styles.dateContainer}>
-                    <DatePickerModule
-                        value={paymentDate}
-                        onChange={setPaymentDate}
-                    />
-                </View>
-            </View>
-
-            {/* Notes */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Notas (Opcional)</Text>
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    value={paymentNotas}
-                    onChangeText={setPaymentNotas}
-                    placeholder="Notas adicionales sobre el pago"
-                    multiline
-                    numberOfLines={3}
-                    maxLength={500}
-                />
-                <Text style={styles.characterCount}>
-                    {paymentNotas.length}/500 caracteres
-                </Text>
-            </View>
-        </ScrollView>
-    );
-
-    return (
-        <>
-            <Modal
-                visible={visible}
-                animationType="slide"
-                transparent
-                onRequestClose={onClose}
-            >
-                <KeyboardAvoidingView
-                    style={styles.modalOverlay}
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                >
-                    <View style={styles.modalContent}>
-                        {/* Header */}
-                        <View style={styles.header}>
-                            <View style={styles.headerInfo}>
-                                <Text style={styles.title}>
-                                    Editar {isSale ? 'Venta' : 'Pago'}
-                                </Text>
-                                <Text style={styles.clientName}>{clienteName}</Text>
-                            </View>
-                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={24} color="#666" />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Error Messages */}
-                        {errors.length > 0 && (
-                            <View style={styles.errorContainer}>
-                                {errors.map((error, index) => (
-                                    <Text key={index} style={styles.errorText}>• {error}</Text>
-                                ))}
-                            </View>
-                        )}
-
-                        {/* Form Content */}
-                        <View style={styles.contentContainer}>
-                            {isSale ? renderSaleForm() : renderPaymentForm()}
-                        </View>
-
-                        {/* Action Buttons */}
-                        <View style={styles.actionContainer}>
-                            <TouchableOpacity
-                                style={[styles.button, styles.deleteButton]}
-                                onPress={handleDelete}
-                                disabled={isLoading}
-                            >
-                                <Ionicons name="trash" size={16} color="#fff" />
-                                <Text style={styles.deleteButtonText}>Eliminar</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.button, styles.cancelButton]}
-                                onPress={onClose}
-                                disabled={isLoading}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancelar</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[
-                                    styles.button,
-                                    styles.submitButton,
-                                    isLoading && styles.disabledButton
-                                ]}
-                                onPress={isSale ? handleSaleUpdate : handlePaymentUpdate}
-                                disabled={isLoading}
-                            >
-                                <Text style={styles.submitButtonText}>
-                                    {isLoading ? 'Guardando...' : 'Actualizar'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
-
-            {/* Product Selector Modal */}
-            <ProductSelector
-                visible={showProductSelector}
-                onClose={() => setShowProductSelector(false)}
-                onSelectProduct={handleProductSelect}
-                onCreateProduct={onCreateProduct}
-                selectedProductId={selectedProduct?.id}
-            />
-
-            {/* Delete Confirmation Modal */}
-            <Modal
-                visible={showDeleteConfirm}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowDeleteConfirm(false)}
-            >
-                <View style={styles.confirmOverlay}>
-                    <View style={styles.confirmModal}>
-                        <Text style={styles.confirmTitle}>Confirmar Eliminación</Text>
-                        <Text style={styles.confirmMessage}>
-                            ¿Estás seguro de que quieres eliminar esta transacción? Esta acción no se puede deshacer.
-                        </Text>
-
-                        <View style={styles.confirmActions}>
-                            <TouchableOpacity
-                                style={[styles.confirmButton, styles.confirmCancel]}
-                                onPress={() => setShowDeleteConfirm(false)}
-                            >
-                                <Text style={styles.confirmCancelText}>Cancelar</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.confirmButton, styles.confirmDelete]}
-                                onPress={confirmDelete}
-                            >
-                                <Text style={styles.confirmDeleteText}>Eliminar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-        </>
-    );
-}
-
-const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        height: '92%',
-        paddingTop: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    headerInfo: {
-        flex: 1,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    clientName: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 2,
-    },
-    closeButton: {
-        padding: 4,
-    },
-    errorContainer: {
-        backgroundColor: '#ffebee',
-        margin: 20,
-        padding: 12,
-        borderRadius: 8,
-    },
-    errorText: {
-        color: '#c62828',
-        fontSize: 14,
-    },
-    contentContainer: {
-        flex: 1,
-        paddingHorizontal: 20,
-    },
-    formContainer: {
-        flex: 1,
-        paddingTop: 16,
-    },
-    formContentSpacer: {
-        paddingBottom: 96,
-    },
-    fieldContainer: {
-        marginBottom: 16,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 8,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        backgroundColor: '#f9f9f9',
-    },
-    textArea: {
-        minHeight: 80,
-        textAlignVertical: 'top',
-    },
-    productSelector: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        backgroundColor: '#f9f9f9',
-    },
-    selectedProductText: {
-        fontSize: 16,
-        color: '#fff',
-        fontWeight: '600',
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-    },
-    placeholderText: {
-        fontSize: 16,
-        color: '#666',
-    },
-    priceRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    halfWidth: {
-        width: '48%',
-    },
-    totalContainer: {
-        backgroundColor: '#e8f5e8',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 16,
-        alignItems: 'center',
-    },
-    totalLabel: {
-        fontSize: 14,
-        color: '#2e7d32',
-        fontWeight: '600',
-    },
-    totalAmount: {
-        fontSize: 18,
-        color: '#2e7d32',
-        fontWeight: 'bold',
-        marginTop: 4,
-    },
-    dateContainer: {
-        backgroundColor: '#f9f9f9',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 4,
-    },
-    characterCount: {
-        fontSize: 12,
-        color: '#666',
-        textAlign: 'right',
-        marginTop: 4,
-    },
-    actionContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-    },
-    button: {
-        flex: 1,
-        paddingVertical: 14,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginHorizontal: 4,
-        flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    deleteButton: {
-        backgroundColor: '#FF4C4C',
-        flex: 0.8,
-    },
-    deleteButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 4,
-    },
-    cancelButton: {
-        backgroundColor: '#f5f5f5',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        flex: 1,
-    },
-    cancelButtonText: {
-        color: '#666',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    submitButton: {
-        backgroundColor: '#25B4BD',
-        flex: 1.2,
-    },
-    submitButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    disabledButton: {
-        opacity: 0.6,
-    },
-    // Delete confirmation modal styles
-    confirmOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    confirmModal: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 24,
-        margin: 20,
-        maxWidth: 320,
-        width: '100%',
-    },
-    confirmTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        textAlign: 'center',
-        marginBottom: 12,
-    },
-    confirmMessage: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 22,
-        marginBottom: 24,
-    },
-    confirmActions: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    confirmButton: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginHorizontal: 6,
-    },
-    confirmCancel: {
-        backgroundColor: '#f5f5f5',
-        borderWidth: 1,
-        borderColor: '#ddd',
-    },
-    confirmCancelText: {
-        color: '#666',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    confirmDelete: {
-        backgroundColor: '#FF4C4C',
-    },
-    confirmDeleteText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-});
+import React, { useState, useEffect } from 'react';import {    View,    Text,    TextInput,    TouchableOpacity,    Modal,    StyleSheet,    Alert,    ScrollView,    KeyboardAvoidingView,    Platform,} from 'react-native';import { Ionicons } from '@expo/vector-icons';import { Timestamp } from 'firebase/firestore';import DatePickerModule from '@/components/DatePicker';import ProductSelector from '@/components/ProductSelector';import {    Product,    TransactionEvent,    SaleEvent,    PaymentEvent,    CreateProductData,    UpdateTransactionEventData} from '@/schemas/types';import {    calculateSaleTotal} from '@/schemas/event-utils';import { isSaleEvent, isPaymentEvent } from '@/schemas/types';interface TransactionEditModalProps {    visible: boolean;    onClose: () => void;    event: TransactionEvent | null;    clienteName: string;    onUpdateTransaction: (eventId: string, updateData: UpdateTransactionEventData) => Promise<void>;    onDeleteTransaction: (eventId: string) => Promise<void>;    onCreateProduct?: (productData: CreateProductData) => Promise<Product | null>;    isLoading?: boolean;}export default function TransactionEditModal({    visible,    onClose,    event,    clienteName,    onUpdateTransaction,    onDeleteTransaction,    onCreateProduct,    isLoading = false}: TransactionEditModalProps) {    const [showProductSelector, setShowProductSelector] = useState(false);    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);    const [cantidad, setCantidad] = useState('');    const [costoUnitario, setCostoUnitario] = useState('');    const [gananciaUnitaria, setGananciaUnitaria] = useState('');    const [saleDate, setSaleDate] = useState(new Date());    const [saleNotas, setSaleNotas] = useState('');    const [montoPago, setMontoPago] = useState('');    const [paymentDate, setPaymentDate] = useState(new Date());    const [paymentNotas, setPaymentNotas] = useState('');    const [errors, setErrors] = useState<string[]>([]);    const initializeForm = (transactionEvent: TransactionEvent) => {        setErrors([]);        if (isSaleEvent(transactionEvent)) {            const saleEvent = transactionEvent as SaleEvent;            setSelectedProduct({                id: 'temp-' + Date.now(),                nombre: saleEvent.producto,                colorFondo: saleEvent.productoColor || '#f0f0f0',                posicion: 0,                activo: true,                creado: Timestamp.now(),                ultimoCosto: saleEvent.costoUnitario,                ultimaGanancia: saleEvent.gananciaUnitaria            });            setCantidad(saleEvent.cantidad.toString());            setCostoUnitario(saleEvent.costoUnitario.toString());            setGananciaUnitaria(saleEvent.gananciaUnitaria.toString());            setSaleDate(saleEvent.fecha.toDate());            setSaleNotas(saleEvent.notas || '');            setMontoPago('');            setPaymentDate(new Date());            setPaymentNotas('');        } else if (isPaymentEvent(transactionEvent)) {            const paymentEvent = transactionEvent as PaymentEvent;            setMontoPago(paymentEvent.montoPago.toString());            setPaymentDate(paymentEvent.fecha.toDate());            setPaymentNotas(paymentEvent.notas || '');            setSelectedProduct(null);            setCantidad('');            setCostoUnitario('');            setGananciaUnitaria('');            setSaleDate(new Date());            setSaleNotas('');        }    };    useEffect(() => {        if (event && visible) {            initializeForm(event);        }    }, [event, visible]);    if (!event) {        return null;    }    const isSale = isSaleEvent(event);    const handleProductSelect = (product: Product, cachedPrices: { ultimoCosto?: number; ultimaGanancia?: number }) => {        setSelectedProduct(product);        if (cachedPrices.ultimoCosto !== undefined && !costoUnitario) {            setCostoUnitario(cachedPrices.ultimoCosto.toString());        }        if (cachedPrices.ultimaGanancia !== undefined && !gananciaUnitaria) {            setGananciaUnitaria(cachedPrices.ultimaGanancia.toString());        }        setShowProductSelector(false);    };    const parseLocaleNumber = (value: string): number => {        if (!value) return NaN;        let sanitized = value.replace(/\s+/g, '');        if (sanitized.includes(',') && sanitized.includes('.')) {            sanitized = sanitized.replace(/\./g, '').replace(',', '.');        } else if (sanitized.includes(',')) {            sanitized = sanitized.replace(',', '.');        }        sanitized = sanitized.replace(/[^0-9.\-]/g, '');        return Number(sanitized);    };    const calculateTotal = (): number => {        const qty = parseLocaleNumber(cantidad) || 0;        const costo = parseLocaleNumber(costoUnitario) || 0;        const ganancia = parseLocaleNumber(gananciaUnitaria) || 0;        return calculateSaleTotal(qty, costo, ganancia);    };    const validateSaleForm = (): boolean => {        const newErrors: string[] = [];        if (!selectedProduct) {            newErrors.push('Selecciona un producto');        }        if (!cantidad || parseLocaleNumber(cantidad) <= 0) {            newErrors.push('La cantidad debe ser mayor a 0');        }        if (!costoUnitario || parseLocaleNumber(costoUnitario) < 0) {            newErrors.push('El costo unitario debe ser mayor o igual a 0');        }        if (!gananciaUnitaria || parseLocaleNumber(gananciaUnitaria) < 0) {            newErrors.push('La ganancia unitaria debe ser mayor o igual a 0');        }        if (saleNotas && saleNotas.length > 500) {            newErrors.push('Las notas no pueden exceder 500 caracteres');        }        setErrors(newErrors);        return newErrors.length === 0;    };    const validatePaymentForm = (): boolean => {        const newErrors: string[] = [];        const parsedMonto = parseLocaleNumber(montoPago);        if (!montoPago || isNaN(parsedMonto) || parsedMonto <= 0) {            newErrors.push('El monto del pago debe ser mayor a 0');        }        if (paymentNotas && paymentNotas.length > 500) {            newErrors.push('Las notas no pueden exceder 500 caracteres');        }        setErrors(newErrors);        return newErrors.length === 0;    };    const handleSaleUpdate = async () => {        if (!validateSaleForm() || !selectedProduct || !event) {            return;        }        try {            const parsedCantidad = parseLocaleNumber(cantidad);            const parsedCosto = parseLocaleNumber(costoUnitario);            const parsedGanancia = parseLocaleNumber(gananciaUnitaria);            const updateData: any = {                producto: selectedProduct.nombre,                productoColor: selectedProduct.colorFondo,                cantidad: parsedCantidad,                costoUnitario: parsedCosto,                gananciaUnitaria: parsedGanancia,                totalVenta: calculateSaleTotal(parsedCantidad, parsedCosto, parsedGanancia),                fecha: Timestamp.fromDate(saleDate),                notas: (saleNotas ?? '').trim(),            };            await onUpdateTransaction(event.id, updateData);            onClose();        } catch (error) {            console.error('Error updating sale:', error);            Alert.alert('Error', 'No se pudo actualizar la venta');        }    };    const handlePaymentUpdate = async () => {        if (!validatePaymentForm() || !event) {            return;        }        try {            const updateData: any = {                montoPago: parseLocaleNumber(montoPago),                fecha: Timestamp.fromDate(paymentDate),                notas: (paymentNotas ?? '').trim(),            };            await onUpdateTransaction(event.id, updateData);            onClose();        } catch (error) {            console.error('Error updating payment:', error);            Alert.alert('Error', 'No se pudo actualizar el pago');        }    };    const handleDelete = () => {        setShowDeleteConfirm(true);    };    const confirmDelete = async () => {        if (!event) return;        try {            await onDeleteTransaction(event.id);            setShowDeleteConfirm(false);            onClose();        } catch (error) {            console.error('Error deleting transaction:', error);            Alert.alert('Error', 'No se pudo eliminar la transacción');        }    };    const renderSaleForm = () => (        <ScrollView            style={styles.formContainer}            contentContainerStyle={styles.formContentSpacer}            showsVerticalScrollIndicator={false}        >            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Producto *</Text>                <TouchableOpacity                    style={[                        styles.productSelector,                        selectedProduct && { backgroundColor: selectedProduct.colorFondo }                    ]}                    onPress={() => setShowProductSelector(true)}                >                    {selectedProduct ? (                        <Text style={styles.selectedProductText}>{selectedProduct.nombre}</Text>                    ) : (                        <Text style={styles.placeholderText}>Seleccionar producto</Text>                    )}                    <Ionicons name="chevron-down" size={20} color={selectedProduct ? "#fff" : "#666"} />                </TouchableOpacity>            </View>            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Cantidad *</Text>                <TextInput                    style={styles.input}                    value={cantidad}                    onChangeText={setCantidad}                    placeholder="1"                    keyboardType="numeric"                />            </View>            {}            <View style={styles.priceRow}>                <View style={[styles.fieldContainer, styles.halfWidth]}>                    <Text style={styles.label}>Costo Unitario *</Text>                    <TextInput                        style={styles.input}                        value={costoUnitario}                        onChangeText={setCostoUnitario}                        placeholder="0.00"                        keyboardType="numeric"                    />                </View>                <View style={[styles.fieldContainer, styles.halfWidth]}>                    <Text style={styles.label}>Ganancia Unitaria *</Text>                    <TextInput                        style={styles.input}                        value={gananciaUnitaria}                        onChangeText={setGananciaUnitaria}                        placeholder="0.00"                        keyboardType="numeric"                    />                </View>            </View>            {}            {costoUnitario && gananciaUnitaria && cantidad && (                <View style={styles.totalContainer}>                    <Text style={styles.totalLabel}>Total de Venta:</Text>                    <Text style={styles.totalAmount}>                        {cantidad} × ({costoUnitario} + {gananciaUnitaria}) = ${calculateTotal().toFixed(2)}                    </Text>                </View>            )}            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Fecha</Text>                <View style={styles.dateContainer}>                    <DatePickerModule                        value={saleDate}                        onChange={setSaleDate}                    />                </View>            </View>            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Notas (Opcional)</Text>                <TextInput                    style={[styles.input, styles.textArea]}                    value={saleNotas}                    onChangeText={setSaleNotas}                    placeholder="Notas adicionales sobre la venta"                    multiline                    numberOfLines={3}                    maxLength={500}                />                <Text style={styles.characterCount}>                    {saleNotas.length}/500 caracteres                </Text>            </View>        </ScrollView>    );    const renderPaymentForm = () => (        <ScrollView            style={styles.formContainer}            contentContainerStyle={styles.formContentSpacer}            showsVerticalScrollIndicator={false}        >            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Monto del Pago *</Text>                <TextInput                    style={styles.input}                    value={montoPago}                    onChangeText={setMontoPago}                    placeholder="0.00"                    keyboardType="numeric"                />            </View>            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Fecha</Text>                <View style={styles.dateContainer}>                    <DatePickerModule                        value={paymentDate}                        onChange={setPaymentDate}                    />                </View>            </View>            {}            <View style={styles.fieldContainer}>                <Text style={styles.label}>Notas (Opcional)</Text>                <TextInput                    style={[styles.input, styles.textArea]}                    value={paymentNotas}                    onChangeText={setPaymentNotas}                    placeholder="Notas adicionales sobre el pago"                    multiline                    numberOfLines={3}                    maxLength={500}                />                <Text style={styles.characterCount}>                    {paymentNotas.length}/500 caracteres                </Text>            </View>        </ScrollView>    );    return (        <>            <Modal                visible={visible}                animationType="slide"                transparent                onRequestClose={onClose}            >                <KeyboardAvoidingView                    style={styles.modalOverlay}                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}                >                    <View style={styles.modalContent}>                        {}                        <View style={styles.header}>                            <View style={styles.headerInfo}>                                <Text style={styles.title}>                                    Editar {isSale ? 'Venta' : 'Pago'}                                </Text>                                <Text style={styles.clientName}>{clienteName}</Text>                            </View>                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>                                <Ionicons name="close" size={24} color="#666" />                            </TouchableOpacity>                        </View>                        {}                        {errors.length > 0 && (                            <View style={styles.errorContainer}>                                {errors.map((error, index) => (                                    <Text key={index} style={styles.errorText}>• {error}</Text>                                ))}                            </View>                        )}                        {}                        <View style={styles.contentContainer}>                            {isSale ? renderSaleForm() : renderPaymentForm()}                        </View>                        {}                        <View style={styles.actionContainer}>                            <TouchableOpacity                                style={[styles.button, styles.deleteButton]}                                onPress={handleDelete}                                disabled={isLoading}                            >                                <Ionicons name="trash" size={16} color="#fff" />                                <Text style={styles.deleteButtonText}>Eliminar</Text>                            </TouchableOpacity>                            <TouchableOpacity                                style={[styles.button, styles.cancelButton]}                                onPress={onClose}                                disabled={isLoading}                            >                                <Text style={styles.cancelButtonText}>Cancelar</Text>                            </TouchableOpacity>                            <TouchableOpacity                                style={[                                    styles.button,                                    styles.submitButton,                                    isLoading && styles.disabledButton                                ]}                                onPress={isSale ? handleSaleUpdate : handlePaymentUpdate}                                disabled={isLoading}                            >                                <Text style={styles.submitButtonText}>                                    {isLoading ? 'Guardando...' : 'Actualizar'}                                </Text>                            </TouchableOpacity>                        </View>                    </View>                </KeyboardAvoidingView>            </Modal>            {}            <ProductSelector                visible={showProductSelector}                onClose={() => setShowProductSelector(false)}                onSelectProduct={handleProductSelect}                onCreateProduct={onCreateProduct}                selectedProductId={selectedProduct?.id}            />            {}            <Modal                visible={showDeleteConfirm}                transparent                animationType="fade"                onRequestClose={() => setShowDeleteConfirm(false)}            >                <View style={styles.confirmOverlay}>                    <View style={styles.confirmModal}>                        <Text style={styles.confirmTitle}>Confirmar Eliminación</Text>                        <Text style={styles.confirmMessage}>                            ¿Estás seguro de que quieres eliminar esta transacción? Esta acción no se puede deshacer.                        </Text>                        <View style={styles.confirmActions}>                            <TouchableOpacity                                style={[styles.confirmButton, styles.confirmCancel]}                                onPress={() => setShowDeleteConfirm(false)}                            >                                <Text style={styles.confirmCancelText}>Cancelar</Text>                            </TouchableOpacity>                            <TouchableOpacity                                style={[styles.confirmButton, styles.confirmDelete]}                                onPress={confirmDelete}                            >                                <Text style={styles.confirmDeleteText}>Eliminar</Text>                            </TouchableOpacity>                        </View>                    </View>                </View>            </Modal>        </>    );}const styles = StyleSheet.create({    modalOverlay: {        flex: 1,        backgroundColor: 'rgba(0, 0, 0, 0.5)',        justifyContent: 'flex-end',    },    modalContent: {        backgroundColor: '#fff',        borderTopLeftRadius: 20,        borderTopRightRadius: 20,        height: '92%',        paddingTop: 20,    },    header: {        flexDirection: 'row',        justifyContent: 'space-between',        alignItems: 'center',        paddingHorizontal: 20,        paddingBottom: 16,        borderBottomWidth: 1,        borderBottomColor: '#eee',    },    headerInfo: {        flex: 1,    },    title: {        fontSize: 20,        fontWeight: 'bold',        color: '#333',    },    clientName: {        fontSize: 14,        color: '#666',        marginTop: 2,    },    closeButton: {        padding: 4,    },    errorContainer: {        backgroundColor: '#ffebee',        margin: 20,        padding: 12,        borderRadius: 8,    },    errorText: {        color: '#c62828',        fontSize: 14,    },    contentContainer: {        flex: 1,        paddingHorizontal: 20,    },    formContainer: {        flex: 1,        paddingTop: 16,    },    formContentSpacer: {        paddingBottom: 96,    },    fieldContainer: {        marginBottom: 16,    },    label: {        fontSize: 16,        fontWeight: '600',        color: '#333',        marginBottom: 8,    },    input: {        borderWidth: 1,        borderColor: '#ddd',        borderRadius: 8,        padding: 12,        fontSize: 16,        backgroundColor: '#f9f9f9',    },    textArea: {        minHeight: 80,        textAlignVertical: 'top',    },    productSelector: {        flexDirection: 'row',        alignItems: 'center',        justifyContent: 'space-between',        borderWidth: 1,        borderColor: '#ddd',        borderRadius: 8,        padding: 12,        backgroundColor: '#f9f9f9',    },    selectedProductText: {        fontSize: 16,        color: '#fff',        fontWeight: '600',        textShadowColor: 'rgba(0, 0, 0, 0.3)',        textShadowOffset: { width: 1, height: 1 },        textShadowRadius: 2,    },    placeholderText: {        fontSize: 16,        color: '#666',    },    priceRow: {        flexDirection: 'row',        justifyContent: 'space-between',    },    halfWidth: {        width: '48%',    },    totalContainer: {        backgroundColor: '#e8f5e8',        padding: 12,        borderRadius: 8,        marginBottom: 16,        alignItems: 'center',    },    totalLabel: {        fontSize: 14,        color: '#2e7d32',        fontWeight: '600',    },    totalAmount: {        fontSize: 18,        color: '#2e7d32',        fontWeight: 'bold',        marginTop: 4,    },    dateContainer: {        backgroundColor: '#f9f9f9',        borderWidth: 1,        borderColor: '#ddd',        borderRadius: 8,        padding: 4,    },    characterCount: {        fontSize: 12,        color: '#666',        textAlign: 'right',        marginTop: 4,    },    actionContainer: {        flexDirection: 'row',        paddingHorizontal: 20,        paddingVertical: 16,        borderTopWidth: 1,        borderTopColor: '#eee',    },    button: {        flex: 1,        paddingVertical: 14,        borderRadius: 8,        alignItems: 'center',        marginHorizontal: 4,        flexDirection: 'row',        justifyContent: 'center',    },    deleteButton: {        backgroundColor: '#FF4C4C',        flex: 0.8,    },    deleteButtonText: {        color: '#fff',        fontSize: 14,        fontWeight: '600',        marginLeft: 4,    },    cancelButton: {        backgroundColor: '#f5f5f5',        borderWidth: 1,        borderColor: '#ddd',        flex: 1,    },    cancelButtonText: {        color: '#666',        fontSize: 16,        fontWeight: '600',    },    submitButton: {        backgroundColor: '#25B4BD',        flex: 1.2,    },    submitButtonText: {        color: '#fff',        fontSize: 16,        fontWeight: '600',    },    disabledButton: {        opacity: 0.6,    },    confirmOverlay: {        flex: 1,        backgroundColor: 'rgba(0, 0, 0, 0.5)',        justifyContent: 'center',        alignItems: 'center',    },    confirmModal: {        backgroundColor: '#fff',        borderRadius: 12,        padding: 24,        margin: 20,        maxWidth: 320,        width: '100%',    },    confirmTitle: {        fontSize: 18,        fontWeight: 'bold',        color: '#333',        textAlign: 'center',        marginBottom: 12,    },    confirmMessage: {        fontSize: 16,        color: '#666',        textAlign: 'center',        lineHeight: 22,        marginBottom: 24,    },    confirmActions: {        flexDirection: 'row',        justifyContent: 'space-between',    },    confirmButton: {        flex: 1,        paddingVertical: 12,        borderRadius: 8,        alignItems: 'center',        marginHorizontal: 6,    },    confirmCancel: {        backgroundColor: '#f5f5f5',        borderWidth: 1,        borderColor: '#ddd',    },    confirmCancelText: {        color: '#666',        fontSize: 16,        fontWeight: '600',    },    confirmDelete: {        backgroundColor: '#FF4C4C',    },    confirmDeleteText: {        color: '#fff',        fontSize: 16,        fontWeight: '600',    },});

@@ -20,7 +20,6 @@ import { useAuth } from '@/context/AuthProvider';
 import { useClients } from '@/context/RealtimeDataProvider';
 import { ClientService } from '@/services/ClientService';
 import { Client, CreateClientData, UpdateClientData } from '@/schemas/types';
-
 export default function ClientsScreen() {
   const { empresaId } = useAuth();
   const {
@@ -31,18 +30,12 @@ export default function ClientsScreen() {
     refreshClients
   } = useClients();
   const [clientService, setClientService] = useState<ClientService | null>(null);
-
-  // State management
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-
-  // Filter state
   const [filters, setFilters] = useState<ClientFilterOptions>({
     searchTerm: '',
     includeHidden: includeHiddenClients,
@@ -50,13 +43,9 @@ export default function ClientsScreen() {
     sortOrder: 'asc',
     debtFilter: 'all'
   });
-
-  // Initialize client service
   useEffect(() => {
     if (empresaId) {
       setClientService(new ClientService(empresaId));
-
-      // Auto-sync debts when screen loads
       const syncDebts = async () => {
         try {
           const { SimpleDebtService } = await import('@/services/SimpleDebtService');
@@ -65,17 +54,12 @@ export default function ClientsScreen() {
           console.warn('Failed to auto-sync debts:', error);
         }
       };
-
       syncDebts();
     }
   }, [empresaId]);
-
-  // Sync local filter state with global state
   useEffect(() => {
     setFilters(prev => ({ ...prev, includeHidden: includeHiddenClients }));
   }, [includeHiddenClients]);
-
-  // Sync debts every time the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       const syncDebts = async () => {
@@ -88,16 +72,11 @@ export default function ClientsScreen() {
           }
         }
       };
-
       syncDebts();
     }, [empresaId])
   );
-
-  // Apply search and debt filters to clients
   useEffect(() => {
     let filtered = [...clients];
-
-    // Apply text search filter
     if (filters.searchTerm.trim()) {
       const searchLower = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(client =>
@@ -107,8 +86,6 @@ export default function ClientsScreen() {
         client.telefono.includes(filters.searchTerm)
       );
     }
-
-    // Apply debt filter
     if (filters.debtFilter !== 'all') {
       filtered = filtered.filter(client => {
         switch (filters.debtFilter) {
@@ -123,75 +100,29 @@ export default function ClientsScreen() {
         }
       });
     }
-
     setFilteredClients(filtered);
   }, [clients, filters.searchTerm, filters.debtFilter]);
-
-  // Debug: Log clients data
   useEffect(() => {
-    console.log('ClientsScreen: Clients data updated', {
-      clientsCount: clients.length,
-      filteredCount: filteredClients.length,
-      includeHidden: includeHiddenClients,
-      filters: filters,
-      clientNames: clients.map(c => c.nombre)
-    });
   }, [clients, filteredClients, includeHiddenClients, filters]);
-
-  // No need for useFocusEffect since we use real-time data
-
-  // Refresh handler
   const handleRefresh = async () => {
     setRefreshing(true);
     refreshClients();
     setRefreshing(false);
   };
-
-  // Create client handler
   const handleCreateClient = async (clientData: CreateClientData | UpdateClientData) => {
     const context = 'ClientsScreen.handleCreateClient';
-    console.log(`${context}: Starting client creation`, {
-      empresaId,
-      clientData,
-      hasClientService: !!clientService
-    });
-
     if (!clientService) {
       console.error(`${context}: No client service available`);
       Alert.alert('Error', 'Servicio de clientes no disponible');
       return;
     }
-
     try {
       setSaving(true);
-      // Type guard to ensure we have CreateClientData for creation
       const createData = clientData as CreateClientData;
-
-      console.log(`${context}: Calling clientService.createClient`, {
-        empresaId,
-        createData
-      });
-
       const result = await clientService.createClient(createData);
-
-      console.log(`${context}: Creation result`, {
-        success: result.success,
-        data: result.data,
-        errors: result.errors
-      });
-
       if (result.success) {
-        console.log(`${context}: Client created successfully`, {
-          clientId: result.data,
-          empresaId
-        });
         setShowCreateModal(false);
         Alert.alert('Éxito', 'Cliente creado exitosamente');
-        // Force refresh to ensure the new client appears
-        console.log(`${context}: Forcing refresh after client creation`, {
-          includeHiddenClients,
-          currentClientsCount: clients.length
-        });
         refreshClients();
       } else {
         console.error(`${context}: Creation failed`, { errors: result.errors });
@@ -211,25 +142,18 @@ export default function ClientsScreen() {
       setSaving(false);
     }
   };
-
-  // Edit client handler
   const handleEditClient = async (clientData: CreateClientData | UpdateClientData) => {
     if (!clientService || !editingClient) return;
-
     try {
       setSaving(true);
-      // Type guard to ensure we have UpdateClientData for updates
       const updateData = clientData as UpdateClientData;
-
       const result = await clientService.updateClient(editingClient.id, updateData);
-
       if (result.success) {
         setShowEditModal(false);
         setEditingClient(null);
         Alert.alert('Éxito', 'Cliente actualizado exitosamente');
-        // Real-time listener will update clients automatically
       } else {
-        Alert.alert('Error', result.error || 'Error al actualizar cliente');
+        Alert.alert('Error', result.errors?.join('\n') || 'Error al actualizar cliente');
       }
     } catch (error) {
       console.error('Error updating client:', error);
@@ -238,23 +162,16 @@ export default function ClientsScreen() {
       setSaving(false);
     }
   };
-
-  // Toggle client visibility
   const handleToggleVisibility = async (clientId: string) => {
     if (!clientService) return;
-
     try {
-      // Get client details to check for active debt
       const clientResult = await clientService.getClient(clientId);
-      if (!clientResult.success || !clientResult.client) {
+      if (!clientResult.success || !clientResult.data) {
         Alert.alert('Error', 'No se pudo obtener información del cliente');
         return;
       }
-
-      const client = clientResult.client;
+      const client = clientResult.data;
       const isHiding = !client.oculto;
-
-      // Show warning if hiding a client with active debt
       if (isHiding && client.deudaActual !== 0) {
         Alert.alert(
           'Cliente con deuda activa',
@@ -270,24 +187,19 @@ export default function ClientsScreen() {
         );
         return;
       }
-
       await performToggleVisibility(clientId);
     } catch (error) {
       console.error('Error toggling visibility:', error);
       Alert.alert('Error', 'Error al cambiar visibilidad');
     }
   };
-
   const performToggleVisibility = async (clientId: string) => {
     if (!clientService) return;
-
     try {
       const result = await clientService.toggleClientVisibility(clientId);
-
       if (result.success) {
         const action = result.isHidden ? 'ocultado' : 'mostrado';
         Alert.alert('Éxito', `Cliente ${action} exitosamente`);
-        // Real-time listener will update clients automatically
       } else {
         Alert.alert('Error', result.error || 'Error al cambiar visibilidad');
       }
@@ -296,27 +208,19 @@ export default function ClientsScreen() {
       Alert.alert('Error', 'Error al cambiar visibilidad');
     }
   };
-
-  // Open edit modal
   const handleOpenEditModal = (client: Client) => {
     setEditingClient(client);
     setShowEditModal(true);
   };
-
-  // Filter handlers
   const handleFiltersChange = (newFilters: ClientFilterOptions) => {
     setFilters(newFilters);
-    // Update global state for includeHidden
     if (newFilters.includeHidden !== includeHiddenClients) {
       setIncludeHiddenClients(newFilters.includeHidden);
     }
   };
-
   const handleClearSearch = () => {
     setFilters(prev => ({ ...prev, searchTerm: '' }));
   };
-
-  // Render client item
   const renderClientItem = ({ item }: { item: Client }) => (
     <ClientModule
       client={item}
@@ -325,8 +229,6 @@ export default function ClientsScreen() {
       showActions={true}
     />
   );
-
-  // Empty state component
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="people-outline" size={64} color="#ccc" />
@@ -349,7 +251,6 @@ export default function ClientsScreen() {
       )}
     </View>
   );
-
   if (!empresaId) {
     return (
       <View style={styles.errorContainer}>
@@ -357,17 +258,13 @@ export default function ClientsScreen() {
       </View>
     );
   }
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Search and Filter Component */}
       <ClientSearchFilter
         filters={filters}
         onFiltersChange={handleFiltersChange}
         onClearSearch={handleClearSearch}
       />
-
-      {/* Header with Add Button and Hidden Toggle */}
       <View style={styles.headerContainer}>
         <TouchableOpacity
           style={styles.addButton}
@@ -376,8 +273,6 @@ export default function ClientsScreen() {
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.addButtonText}>Agregar Cliente</Text>
         </TouchableOpacity>
-
-        {/* Refresh button */}
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={handleRefresh}
@@ -389,9 +284,6 @@ export default function ClientsScreen() {
             color="#25B4BD"
           />
         </TouchableOpacity>
-
-
-        {/* Quick toggle for hidden clients */}
         <TouchableOpacity
           style={[
             styles.toggleHiddenButton,
@@ -412,8 +304,6 @@ export default function ClientsScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-
-      {/* Client List */}
       {clientsLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#25B4BD" />
@@ -439,8 +329,6 @@ export default function ClientsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-
-      {/* Create Client Modal */}
       <Modal
         visible={showCreateModal}
         animationType="slide"
@@ -452,8 +340,6 @@ export default function ClientsScreen() {
           isLoading={saving}
         />
       </Modal>
-
-      {/* Edit Client Modal */}
       <Modal
         visible={showEditModal}
         animationType="slide"
@@ -475,7 +361,6 @@ export default function ClientsScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

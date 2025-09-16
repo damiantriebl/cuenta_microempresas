@@ -1,50 +1,1 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Client } from '@/schemas/types';
-
-interface ClientSelectionContextType {
-  selectedClient: Client | null;
-  selectClient: (client: Client) => void;
-  clearSelection: () => void;
-  isClientSelected: boolean;
-}
-
-const ClientSelectionContext = createContext<ClientSelectionContextType | undefined>(undefined);
-
-interface ClientSelectionProviderProps {
-  children: ReactNode;
-}
-
-export function ClientSelectionProvider({ children }: ClientSelectionProviderProps) {
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-
-  const selectClient = useCallback((client: Client) => {
-    setSelectedClient(client);
-  }, []);
-
-  const clearSelection = useCallback(() => {
-    setSelectedClient(null);
-  }, []);
-
-  const isClientSelected = selectedClient !== null;
-
-  const value: ClientSelectionContextType = {
-    selectedClient,
-    selectClient,
-    clearSelection,
-    isClientSelected,
-  };
-
-  return (
-    <ClientSelectionContext.Provider value={value}>
-      {children}
-    </ClientSelectionContext.Provider>
-  );
-}
-
-export function useClientSelection(): ClientSelectionContextType {
-  const context = useContext(ClientSelectionContext);
-  if (context === undefined) {
-    throw new Error('useClientSelection must be used within a ClientSelectionProvider');
-  }
-  return context;
-}
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';import { Client } from '@/schemas/types';interface ClientSelectionContextType {  selectedClient: Client | null;  selectClient: (client: Client) => void;  clearSelection: () => void;  isClientSelected: boolean;}const ClientSelectionContext = createContext<ClientSelectionContextType | undefined>(undefined);interface ClientSelectionProviderProps {  children: ReactNode;}export function ClientSelectionProvider({ children }: ClientSelectionProviderProps) {  const [selectedClient, setSelectedClient] = useState<Client | null>(null);  const selectClient = useCallback((client: Client) => {    setSelectedClient(client);  }, []);  const clearSelection = useCallback(() => {    setSelectedClient(null);  }, []);  const isClientSelected = selectedClient !== null;  const value: ClientSelectionContextType = {    selectedClient,    selectClient,    clearSelection,    isClientSelected,  };  return (    <ClientSelectionContext.Provider value={value}>      {children}    </ClientSelectionContext.Provider>  );}export function useClientSelection(): ClientSelectionContextType {  const context = useContext(ClientSelectionContext);  if (context === undefined) {    throw new Error('useClientSelection must be used within a ClientSelectionProvider');  }  return context;}

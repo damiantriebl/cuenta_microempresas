@@ -10,14 +10,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { TransactionEvent } from '@/schemas/types';
 import { formatDate } from '@/schemas/business-logic';
 import { isSaleEvent } from '@/schemas/types';
-
 interface NotesModalProps {
   visible: boolean;
   onClose: () => void;
   event: TransactionEvent | null;
   clienteName: string;
 }
-
 export default function NotesModal({
   visible,
   onClose,
@@ -27,9 +25,7 @@ export default function NotesModal({
   if (!event || !event.notas || event.notas.trim().length === 0) {
     return null;
   }
-
   const isSale = isSaleEvent(event);
-
   return (
     <Modal
       visible={visible}
@@ -39,7 +35,7 @@ export default function NotesModal({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          {/* Header */}
+          {}
           <View style={styles.header}>
             <View style={styles.headerInfo}>
               <Text style={styles.title}>Notas de Transacción</Text>
@@ -54,8 +50,7 @@ export default function NotesModal({
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
-
-          {/* Transaction Summary */}
+          {}
           <View style={styles.transactionSummary}>
             {isSale && (
               <>
@@ -76,16 +71,14 @@ export default function NotesModal({
               </>
             )}
           </View>
-
-          {/* Notes Content */}
+          {}
           <View style={styles.notesContainer}>
             <Text style={styles.notesLabel}>Notas:</Text>
             <ScrollView style={styles.notesScrollView} showsVerticalScrollIndicator={false}>
               <Text style={styles.notesText}>{event.notas}</Text>
             </ScrollView>
           </View>
-
-          {/* Close Button */}
+          {}
           <View style={styles.actionContainer}>
             <TouchableOpacity
               style={styles.closeActionButton}
@@ -99,7 +92,6 @@ export default function NotesModal({
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,

@@ -3,6 +3,13 @@
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,
+    // These will be enabled during the cleanup process
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    // "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": [
         "./*"
@@ -12,5 +19,15 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "exclude": [
+    "**/__tests__/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "scripts/**/*",
+    "node_modules",
+    "dist",
+    "android/build",
+    "android/app/build"
   ]
 }

@@ -10,98 +10,113 @@ const path = require('path');
 
 console.log('🔍 Validating app configuration...\n');
 
-// Check if app.config.js exists
+// Check if app.json or app.config.js exists
+const appJsonPath = path.join(process.cwd(), 'app.json');
 const appConfigPath = path.join(process.cwd(), 'app.config.js');
-if (!fs.existsSync(appConfigPath)) {
-  console.error('❌ app.config.js not found');
-  process.exit(1);
-}
-console.log('✅ app.config.js exists');
 
-// Load and validate app.config.js
 let config;
-try {
-  config = require(appConfigPath);
-  if (typeof config === 'function') {
-    config = config();
+let configSource;
+
+if (fs.existsSync(appJsonPath)) {
+  console.log('✅ app.json exists');
+  configSource = 'app.json';
+  try {
+    const jsonContent = fs.readFileSync(appJsonPath, 'utf8');
+    config = JSON.parse(jsonContent).expo;
+  } catch (error) {
+    console.error('❌ Failed to parse app.json:', error.message);
+    process.exit(1);
   }
-} catch (error) {
-  console.error('❌ Failed to load app.config.js:', error.message);
+} else if (fs.existsSync(appConfigPath)) {
+  console.log('✅ app.config.js exists');
+  configSource = 'app.config.js';
+  try {
+    config = require(appConfigPath);
+    if (typeof config === 'function') {
+      config = config();
+    }
+  } catch (error) {
+    console.error('❌ Failed to load app.config.js:', error.message);
+    process.exit(1);
+  }
+} else {
+  console.error('❌ Neither app.json nor app.config.js found');
   process.exit(1);
 }
-console.log('✅ app.config.js loads successfully');
+console.log(`✅ ${configSource} loads successfully`);
 
 // Debug: Show what we loaded
 console.log('🔍 Debug - Config keys:', Object.keys(config));
-console.log('🔍 Debug - Expo keys:', Object.keys(config.expo || {}));
 console.log('🔍 Debug - Extra keys:', Object.keys(config.expo?.extra || {}));
 console.log('🔍 Debug - EAS object:', config.expo?.extra?.eas);
 
 // Validate EAS project ID
-if (!config.expo?.extra?.eas?.projectId) {
+if (!config.extra?.eas?.projectId) {
   console.error('❌ EAS project ID not configured');
   process.exit(1);
 }
-console.log('✅ EAS project ID configured:', config.expo.extra.eas.projectId);
+console.log('✅ EAS project ID configured:', config.extra.eas.projectId);
 
-// Validate expo-notifications plugin
-const notificationPlugin = config.expo?.plugins?.find(plugin => 
+// Validate that expo-notifications plugin is NOT present (we removed it)
+const notificationPlugin = config.plugins?.find(plugin => 
   Array.isArray(plugin) && plugin[0] === 'expo-notifications'
 );
-if (!notificationPlugin) {
-  console.error('❌ expo-notifications plugin not configured');
+if (notificationPlugin) {
+  console.error('❌ expo-notifications plugin still configured (should be removed)');
   process.exit(1);
 }
-console.log('✅ expo-notifications plugin configured');
+console.log('✅ expo-notifications plugin properly removed');
 
-// Validate notification icon
-const notificationConfig = notificationPlugin[1];
-if (!notificationConfig?.icon) {
-  console.error('❌ Notification icon not configured');
-  process.exit(1);
-}
+// Validate basic required plugins
+const requiredPlugins = ['expo-dev-client', 'expo-router'];
+const configuredPlugins = config.plugins || [];
 
-const iconPath = path.join(process.cwd(), notificationConfig.icon);
-if (!fs.existsSync(iconPath)) {
-  console.error('❌ Notification icon file not found:', notificationConfig.icon);
-  process.exit(1);
-}
-console.log('✅ Notification icon configured and exists:', notificationConfig.icon);
-
-// Validate notification color
-if (!notificationConfig?.color) {
-  console.error('❌ Notification color not configured');
-  process.exit(1);
-}
-console.log('✅ Notification color configured:', notificationConfig.color);
+requiredPlugins.forEach(pluginName => {
+  const isConfigured = configuredPlugins.some(plugin => {
+    if (typeof plugin === 'string') return plugin === pluginName;
+    if (Array.isArray(plugin)) return plugin[0] === pluginName;
+    return false;
+  });
+  
+  if (isConfigured) {
+    console.log(`✅ ${pluginName} plugin configured`);
+  } else {
+    console.error(`❌ ${pluginName} plugin not configured`);
+    process.exit(1);
+  }
+});
 
 // Validate Android configuration
-if (!config.expo?.android?.package) {
+if (!config.android?.package) {
   console.error('❌ Android package name not configured');
   process.exit(1);
 }
-console.log('✅ Android package name configured:', config.expo.android.package);
+console.log('✅ Android package name configured:', config.android.package);
 
-// Check google-services.json
-const googleServicesPath = path.join(process.cwd(), 'android/app/google-services.json');
-if (!fs.existsSync(googleServicesPath)) {
-  console.warn('⚠️  google-services.json not found - this is needed for production builds');
+// Validate iOS configuration (optional but recommended)
+if (config.ios?.bundleIdentifier) {
+  console.log('✅ iOS bundle identifier configured:', config.ios.bundleIdentifier);
 } else {
-  console.log('✅ google-services.json exists');
+  console.warn('⚠️  iOS bundle identifier not configured (optional)');
 }
 
-// Validate Android googleServicesFile reference
-if (!config.expo?.android?.googleServicesFile) {
-  console.error('❌ Android googleServicesFile not configured');
+// Validate basic app information
+if (!config.name) {
+  console.error('❌ App name not configured');
   process.exit(1);
 }
-console.log('✅ Android googleServicesFile configured:', config.expo.android.googleServicesFile);
+console.log('✅ App name configured:', config.name);
+
+if (!config.version) {
+  console.error('❌ App version not configured');
+  process.exit(1);
+}
+console.log('✅ App version configured:', config.version);
 
 console.log('\n🎉 App configuration validation completed successfully!');
 console.log('\n📋 Configuration Summary:');
-console.log(`   • App Name: ${config.expo.name}`);
-console.log(`   • Package: ${config.expo.android.package}`);
-console.log(`   • EAS Project: ${config.expo.extra.eas.projectId}`);
-console.log(`   • Notification Icon: ${notificationConfig.icon}`);
-console.log(`   • Notification Color: ${notificationConfig.color}`);
-console.log(`   • Google Services: ${config.expo.android.googleServicesFile}`);
+console.log(`   • App Name: ${config.name}`);
+console.log(`   • Version: ${config.version}`);
+console.log(`   • Android Package: ${config.android.package}`);
+console.log(`   • EAS Project: ${config.extra.eas.projectId}`);
+console.log(`   • Push Notifications: Disabled (properly removed)`);
