@@ -1,0 +1,13 @@
+{
+  "googlePlay": {
+    "appName": "Campo - Gestión de Ventas",
+    "shortDescription": "Gestiona tus ventas, clientes y productos de forma simple y eficiente",
+    "fullDescription": "Campo es una aplicación completa para la gestión de ventas diseñada especialmente para pequeñas y medianas empresas.\n\nCaracterísticas principales:\n• Gestión completa de clientes con historial de transacciones\n• Catálogo de productos personalizable con precios y colores\n• Control de deudas y pagos en tiempo real\n• Sistema de empresas colaborativo\n• Notificaciones automáticas\n• Interfaz intuitiva y fácil de usar\n• Sincronización en tiempo real\n• Modo offline para trabajar sin conexión\n\nPerfecta para:\n• Tiendas de barrio\n• Distribuidores\n• Vendedores independientes\n• Pequeñas empresas familiares\n• Cualquier negocio que maneje ventas a crédito\n\nSimplifica tu gestión comercial con Campo y mantén el control total de tu negocio desde tu dispositivo móvil.",
+    "category": "BUSINESS",
+    "contentRating": "Everyone",
+    "website": "https://santexgroup.com",
+    "email": "damiantriebl@gmail.com",
+    "privacyPolicy": "https://santexgroup.com/privacy-policy",
+    "keywords": ["ventas", "gestión", "clientes", "productos", "empresa", "negocio", "crédito", "deudas", "pagos"]
+  }
+}

@@ -1,0 +1,545 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/context/AuthProvider';
+import { subscribeToCompanyMembers } from '@/schemas/firestore-utils';
+import {
+  getCompany,
+  removeCompanyMember,
+} from '@/schemas/firestore-utils';
+import { CompanyMember, Company } from '@/schemas/types';
+import { companyService } from '@/services/CompanyService';
+
+export default function CompanyMembersScreen() {
+  const router = useRouter();
+  const { empresaId } = useLocalSearchParams<{ empresaId: string }>();
+  const { user, refreshEmpresas } = useAuth();
+  const [members, setMembers] = useState<CompanyMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [removingMembers, setRemovingMembers] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!empresaId || !user) return;
+    loadInitialData();
+  }, [empresaId, user]);
+
+  // Suscripción en tiempo real a miembros de la empresa del parámetro
+  useEffect(() => {
+    if (!empresaId) return;
+
+    setMembersLoading(true);
+
+    const unsubscribe = subscribeToCompanyMembers(empresaId, (updated) => {
+      setMembers(updated);
+      setMembersLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+      setMembersLoading(false);
+    };
+  }, [empresaId]);
+
+  // Enhanced permission verification logic
+  const verifyOwnerPermissions = (company: Company | null, user: any, userRole: string | null) => {
+    if (!user || !company) {
+      return {
+        isOwner: false,
+        verificationMethod: 'none' as const,
+        debugInfo: {
+          companyOwner: company?.propietario || 'N/A',
+          userUid: user?.uid || 'N/A',
+          userEmail: user?.email || 'N/A',
+          userRole: userRole || 'N/A'
+        }
+      };
+    }
+
+    // Method 1: Check if propietario field matches user UID
+    if (company.propietario === user.uid) {
+      return {
+        isOwner: true,
+        verificationMethod: 'propietario_uid' as const,
+        debugInfo: {
+          companyOwner: company.propietario,
+          userUid: user.uid,
+          userEmail: user.email || 'N/A',
+          userRole: userRole || 'N/A'
+        }
+      };
+    }
+
+    // Method 2: Check if propietario field matches user email
+    if (company.propietario === user.email) {
+      return {
+        isOwner: true,
+        verificationMethod: 'propietario_email' as const,
+        debugInfo: {
+          companyOwner: company.propietario,
+          userUid: user.uid,
+          userEmail: user.email || 'N/A',
+          userRole: userRole || 'N/A'
+        }
+      };
+    }
+
+    // Method 3: Check if user has 'owner' role in members table
+    if (userRole === 'owner') {
+      return {
+        isOwner: true,
+        verificationMethod: 'member_role' as const,
+        debugInfo: {
+          companyOwner: company.propietario,
+          userUid: user.uid,
+          userEmail: user.email || 'N/A',
+          userRole: userRole
+        }
+      };
+    }
+
+    return {
+      isOwner: false,
+      verificationMethod: 'none' as const,
+      debugInfo: {
+        companyOwner: company.propietario,
+        userUid: user.uid,
+        userEmail: user.email || 'N/A',
+        userRole: userRole || 'N/A'
+      }
+    };
+  };
+
+  const loadInitialData = async () => {
+    if (!empresaId || !user) return;
+
+    try {
+      setLoading(true);
+
+      // Load company details
+      const companyData = await getCompany(empresaId);
+      setCompany(companyData);
+
+      // Load user role from company members
+      const membersResponse = await companyService.getCompanyMembers(empresaId);
+
+      let currentUserRole: string | null = null;
+
+      if (membersResponse.success && membersResponse.data) {
+        const currentUserMember = membersResponse.data.find(
+          member => member.userId === user.uid || member.email === user.email
+        );
+
+        if (currentUserMember) {
+          currentUserRole = currentUserMember.role;
+          setUserRole(currentUserMember.role);
+        } else {
+          setUserRole(null);
+        }
+      } else {
+        setUserRole(null);
+      }
+
+      // Check if user has owner permissions before allowing access
+      const permissionCheck = verifyOwnerPermissions(companyData, user, currentUserRole);
+
+      if (!permissionCheck.isOwner) {
+        Alert.alert(
+          'Acceso Denegado',
+          'Solo los propietarios pueden ver los miembros de la empresa.',
+          [
+            {
+              text: 'Entendido',
+              onPress: () => router.back()
+            }
+          ]
+        );
+        return;
+      }
+
+    } catch (error) {
+      console.error('Error loading company data:', error);
+      Alert.alert('Error', 'No se pudieron cargar los datos de la empresa');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadInitialData();
+    setRefreshing(false);
+  };
+
+  const isCurrentUserOwner = (): boolean => {
+    if (!user || !company) return false;
+    const permissionCheck = verifyOwnerPermissions(company, user, userRole);
+    return permissionCheck.isOwner;
+  };
+
+  const canRemoveMember = (member: CompanyMember): boolean => {
+    if (!user || !isCurrentUserOwner()) return false;
+
+    // Owner cannot remove themselves
+    if (member.userId === user.uid) return false;
+
+    // Can only remove regular members, not other owners
+    return member.role === 'member';
+  };
+
+  const handleRemoveMember = async (member: CompanyMember) => {
+    if (!canRemoveMember(member)) {
+      Alert.alert('Error', 'No tienes permisos para eliminar este miembro');
+      return;
+    }
+
+    Alert.alert(
+      'Eliminar miembro',
+      `¿Estás seguro de que quieres eliminar a ${member.email} de la empresa?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => removeMember(member),
+        },
+      ]
+    );
+  };
+
+  const removeMember = async (member: CompanyMember) => {
+    if (!empresaId) return;
+
+    setRemovingMembers(prev => new Set(prev).add(member.userId));
+
+    try {
+      await removeCompanyMember(empresaId, member.userId);
+
+      Alert.alert(
+        'Miembro eliminado',
+        `${member.email} ha sido eliminado de la empresa`
+      );
+
+      // Real-time listener will update the members list automatically
+
+      // Refresh user's company memberships in case it affects the current user
+      await refreshEmpresas();
+
+    } catch (error) {
+      console.error('Error removing member:', error);
+      Alert.alert('Error', 'No se pudo eliminar el miembro');
+    } finally {
+      setRemovingMembers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(member.userId);
+        return newSet;
+      });
+    }
+  };
+
+  const renderMemberItem = ({ item }: { item: CompanyMember }) => {
+    const isRemoving = removingMembers.has(item.userId);
+    const canRemove = canRemoveMember(item);
+    const isCurrentUser = user?.uid === item.userId;
+
+    return (
+      <View style={styles.memberItem}>
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberEmail}>
+            {item.email}
+            {isCurrentUser && <Text style={styles.currentUserLabel}> (Tú)</Text>}
+          </Text>
+          <Text style={styles.memberDetails}>
+            Rol: {item.role === 'owner' ? 'Propietario' : 'Miembro'}
+          </Text>
+          <Text style={styles.memberDetails}>
+            Desde: {item.fechaIngreso?.toDate?.()?.toLocaleDateString() || 'Fecha no disponible'}
+          </Text>
+        </View>
+
+        <View style={styles.memberActions}>
+          <View style={[
+            styles.roleBadge,
+            item.role === 'owner' ? styles.ownerBadge : styles.memberBadge
+          ]}>
+            <Text style={[
+              styles.roleBadgeText,
+              item.role === 'owner' ? styles.ownerBadgeText : styles.memberBadgeText
+            ]}>
+              {item.role === 'owner' ? 'Propietario' : 'Miembro'}
+            </Text>
+          </View>
+
+          {canRemove && (
+            <TouchableOpacity
+              style={[styles.removeButton, isRemoving && styles.disabledButton]}
+              onPress={() => handleRemoveMember(item)}
+              disabled={isRemoving}
+            >
+              {isRemoving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.removeButtonText}>Eliminar</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  if (loading || membersLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#25B4BD" />
+        <Text style={styles.loadingText}>Cargando miembros...</Text>
+      </View>
+    );
+  }
+
+  const ownerMembers = members.filter(m => m.role === 'owner');
+  const regularMembers = members.filter(m => m.role === 'member');
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Miembros de la Empresa</Text>
+        {company && (
+          <Text style={styles.companyName}>{company.nombre}</Text>
+        )}
+        <Text style={styles.memberCount}>
+          Total: {members.length} miembro{members.length !== 1 ? 's' : ''}
+        </Text>
+      </View>
+
+      <FlatList
+        data={[...ownerMembers, ...regularMembers]}
+        keyExtractor={(item) => item.userId}
+        renderItem={renderMemberItem}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              No hay miembros en esta empresa
+            </Text>
+          </View>
+        )}
+        contentContainerStyle={members.length === 0 ? styles.emptyList : undefined}
+        ListHeaderComponent={() => (
+          <View style={styles.sectionHeaders}>
+            {ownerMembers.length > 0 && (
+              <Text style={styles.sectionTitle}>Propietarios</Text>
+            )}
+          </View>
+        )}
+        ListFooterComponent={() => (
+          <View style={styles.footer}>
+            {!isCurrentUserOwner() && (
+              <View style={styles.permissionNotice}>
+                <Text style={styles.permissionNoticeText}>
+                  Solo los propietarios pueden gestionar miembros
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      />
+
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+      >
+        <Text style={styles.backButtonText}>Volver</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ebebeb',
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 16,
+    paddingTop: 30,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  companyName: {
+    fontSize: 16,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  memberCount: {
+    fontSize: 14,
+    color: '#25B4BD',
+    fontWeight: '600',
+  },
+  sectionHeaders: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  memberItem: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  memberInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  memberEmail: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  currentUserLabel: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    color: '#25B4BD',
+  },
+  memberDetails: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 2,
+  },
+  memberActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  roleBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  ownerBadge: {
+    backgroundColor: '#25B4BD',
+  },
+  memberBadge: {
+    backgroundColor: '#6c757d',
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  ownerBadgeText: {
+    color: '#fff',
+  },
+  memberBadgeText: {
+    color: '#fff',
+  },
+  removeButton: {
+    backgroundColor: '#dc3545',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  removeButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ebebeb',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666666',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  emptyList: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  permissionNotice: {
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107',
+  },
+  permissionNoticeText: {
+    fontSize: 14,
+    color: '#856404',
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#25B4BD',
+    marginHorizontal: 16,
+    marginVertical: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

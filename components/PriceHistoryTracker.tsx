@@ -1,0 +1,408 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  FlatList,
+  Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Timestamp } from 'firebase/firestore';
+
+interface PriceHistoryEntry {
+  id: string;
+  productId: string;
+  productName: string;
+  costo: number;
+  ganancia: number;
+  total: number;
+  fecha: Timestamp;
+  usado: number; // How many times this price combination was used
+}
+
+interface PriceHistoryTrackerProps {
+  visible: boolean;
+  onClose: () => void;
+  productId: string;
+  productName: string;
+  onSelectPrice: (costo: number, ganancia: number) => void;
+}
+
+const PRICE_HISTORY_KEY = 'price_history';
+const MAX_HISTORY_ENTRIES = 50;
+
+export default function PriceHistoryTracker({
+  visible,
+  onClose,
+  productId,
+  productName,
+  onSelectPrice,
+}: PriceHistoryTrackerProps) {
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      loadPriceHistory();
+    }
+  }, [visible, productId]);
+
+  const loadPriceHistory = async () => {
+    setIsLoading(true);
+    try {
+      const historyData = await AsyncStorage.getItem(PRICE_HISTORY_KEY);
+      if (historyData) {
+        const allHistory: PriceHistoryEntry[] = JSON.parse(historyData);
+        
+        // Filter history for this product and sort by usage and date
+        const productHistory = allHistory
+          .filter(entry => entry.productId === productId)
+          .sort((a, b) => {
+            // Sort by usage count (descending) then by date (descending)
+            if (b.usado !== a.usado) {
+              return b.usado - a.usado;
+            }
+            return b.fecha.toMillis() - a.fecha.toMillis();
+          });
+
+        setPriceHistory(productHistory);
+      }
+    } catch (error) {
+      console.error('Error loading price history:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectPrice = (entry: PriceHistoryEntry) => {
+    // Update usage count
+    updatePriceUsage(entry.id);
+    
+    // Call the callback with selected prices
+    onSelectPrice(entry.costo, entry.ganancia);
+    onClose();
+  };
+
+  const updatePriceUsage = async (entryId: string) => {
+    try {
+      const historyData = await AsyncStorage.getItem(PRICE_HISTORY_KEY);
+      if (historyData) {
+        const allHistory: PriceHistoryEntry[] = JSON.parse(historyData);
+        const updatedHistory = allHistory.map(entry => 
+          entry.id === entryId 
+            ? { ...entry, usado: entry.usado + 1 }
+            : entry
+        );
+        
+        await AsyncStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(updatedHistory));
+      }
+    } catch (error) {
+      console.error('Error updating price usage:', error);
+    }
+  };
+
+  const clearHistory = () => {
+    Alert.alert(
+      'Limpiar Historial',
+      '¿Estás seguro de que quieres eliminar todo el historial de precios para este producto?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Eliminar', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const historyData = await AsyncStorage.getItem(PRICE_HISTORY_KEY);
+              if (historyData) {
+                const allHistory: PriceHistoryEntry[] = JSON.parse(historyData);
+                const filteredHistory = allHistory.filter(entry => entry.productId !== productId);
+                await AsyncStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(filteredHistory));
+                setPriceHistory([]);
+              }
+            } catch (error) {
+              console.error('Error clearing price history:', error);
+              Alert.alert('Error', 'No se pudo limpiar el historial');
+            }
+          }
+        },
+      ]
+    );
+  };
+
+  const formatDate = (timestamp: Timestamp) => {
+    return timestamp.toDate().toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    });
+  };
+
+  const formatPrice = (price: number) => {
+    return `$${price.toFixed(2)}`;
+  };
+
+  const renderHistoryEntry = ({ item: entry }: { item: PriceHistoryEntry }) => (
+    <TouchableOpacity
+      style={styles.historyItem}
+      onPress={() => handleSelectPrice(entry)}
+    >
+      <View style={styles.priceInfo}>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Costo:</Text>
+          <Text style={styles.priceValue}>{formatPrice(entry.costo)}</Text>
+        </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Ganancia:</Text>
+          <Text style={styles.priceValue}>{formatPrice(entry.ganancia)}</Text>
+        </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.totalLabel}>Total:</Text>
+          <Text style={styles.totalValue}>{formatPrice(entry.total)}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.metaInfo}>
+        <Text style={styles.dateText}>{formatDate(entry.fecha)}</Text>
+        <View style={styles.usageInfo}>
+          <Ionicons name="repeat" size={14} color="#666" />
+          <Text style={styles.usageText}>{entry.usado}x</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Historial de Precios</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.productName}>{productName}</Text>
+
+          {priceHistory.length > 0 && (
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={clearHistory}
+              >
+                <Ionicons name="trash-outline" size={16} color="#FF6B6B" />
+                <Text style={styles.clearButtonText}>Limpiar Historial</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <FlatList
+            data={priceHistory}
+            renderItem={renderHistoryEntry}
+            keyExtractor={(item) => item.id}
+            style={styles.historyList}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="time-outline" size={48} color="#ccc" />
+                <Text style={styles.emptyText}>Sin historial de precios</Text>
+                <Text style={styles.emptySubtext}>
+                  Los precios se guardarán automáticamente cuando crees transacciones
+                </Text>
+              </View>
+            }
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// Static method to save price to history
+export const savePriceToHistory = async (
+  productId: string,
+  productName: string,
+  costo: number,
+  ganancia: number
+): Promise<void> => {
+  try {
+    const historyData = await AsyncStorage.getItem(PRICE_HISTORY_KEY);
+    let allHistory: PriceHistoryEntry[] = historyData ? JSON.parse(historyData) : [];
+
+    // Check if this exact price combination already exists
+    const existingEntry = allHistory.find(entry => 
+      entry.productId === productId &&
+      Math.abs(entry.costo - costo) < 0.01 &&
+      Math.abs(entry.ganancia - ganancia) < 0.01
+    );
+
+    if (existingEntry) {
+      // Update usage count and date
+      existingEntry.usado += 1;
+      existingEntry.fecha = Timestamp.now();
+    } else {
+      // Create new entry
+      const newEntry: PriceHistoryEntry = {
+        id: `${productId}_${Date.now()}`,
+        productId,
+        productName,
+        costo,
+        ganancia,
+        total: costo + ganancia,
+        fecha: Timestamp.now(),
+        usado: 1,
+      };
+
+      allHistory.push(newEntry);
+
+      // Keep only the most recent entries (per product)
+      const productEntries = allHistory.filter(entry => entry.productId === productId);
+      if (productEntries.length > MAX_HISTORY_ENTRIES) {
+        // Remove oldest entries for this product
+        const sortedEntries = productEntries.sort((a, b) => b.fecha.toMillis() - a.fecha.toMillis());
+        const entriesToKeep = sortedEntries.slice(0, MAX_HISTORY_ENTRIES);
+        
+        // Rebuild history with kept entries and other products
+        allHistory = [
+          ...allHistory.filter(entry => entry.productId !== productId),
+          ...entriesToKeep
+        ];
+      }
+    }
+
+    await AsyncStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(allHistory));
+  } catch (error) {
+    console.error('Error saving price to history:', error);
+  }
+};
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 500,
+    maxHeight: '80%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  productName: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  actions: {
+    alignItems: 'flex-end',
+    marginBottom: 16,
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  clearButtonText: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  historyList: {
+    flex: 1,
+  },
+  historyItem: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    marginVertical: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#25B4BD',
+  },
+  priceInfo: {
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 2,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  priceValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#25B4BD',
+  },
+  metaInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  usageInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  usageText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+});

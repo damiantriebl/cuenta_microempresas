@@ -1,0 +1,195 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is the owner of a company
+    function isCompanyOwner(empresaId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/empresas/$(empresaId)/miembros/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/empresas/$(empresaId)/miembros/$(request.auth.uid)).data.role == 'owner';
+    }
+    
+    // Check if user is a member of a company (owner or member)
+    function isCompanyMember(empresaId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/empresas/$(empresaId)/miembros/$(request.auth.uid));
+    }
+    
+    // Check if user can read company data
+    function canReadCompany(empresaId) {
+      return isCompanyMember(empresaId);
+    }
+    
+    // Check if user can write company data
+    function canWriteCompany(empresaId) {
+      return isCompanyMember(empresaId);
+    }
+    
+    // Validate company data structure
+    function isValidCompanyData() {
+      return request.resource.data.keys().hasAll(['nombre', 'propietario', 'creado']) &&
+             request.resource.data.nombre is string &&
+             request.resource.data.nombre.size() > 0 &&
+             request.resource.data.nombre.size() <= 100 &&
+             request.resource.data.propietario is string &&
+             request.resource.data.creado is timestamp;
+    }
+    
+    // Validate product data structure
+    function isValidProductData() {
+      return request.resource.data.keys().hasAll(['nombre', 'colorFondo', 'posicion', 'activo', 'creado']) &&
+             request.resource.data.nombre is string &&
+             request.resource.data.nombre.size() > 0 &&
+             request.resource.data.nombre.size() <= 50 &&
+             request.resource.data.colorFondo is string &&
+             request.resource.data.colorFondo.matches('^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$') &&
+             request.resource.data.posicion is number &&
+             request.resource.data.posicion >= 0 &&
+             request.resource.data.activo is bool &&
+             request.resource.data.creado is timestamp;
+    }
+    
+    // Validate client data structure
+    function isValidClientData() {
+      return request.resource.data.keys().hasAll(['nombre', 'direccion', 'telefono', 'oculto', 'deudaActual', 'creado']) &&
+             request.resource.data.nombre is string &&
+             request.resource.data.nombre.size() > 0 &&
+             request.resource.data.nombre.size() <= 100 &&
+             request.resource.data.direccion is string &&
+             request.resource.data.direccion.size() > 0 &&
+             request.resource.data.direccion.size() <= 200 &&
+             request.resource.data.telefono is string &&
+             request.resource.data.telefono.size() > 0 &&
+             request.resource.data.oculto is bool &&
+             request.resource.data.deudaActual is number &&
+             request.resource.data.creado is timestamp;
+    }
+    
+    // Validate transaction event data structure
+    function isValidTransactionEventData() {
+      let baseValid = request.resource.data.keys().hasAll(['clienteId', 'tipo', 'fecha', 'creado', 'borrado']) &&
+                      request.resource.data.clienteId is string &&
+                      request.resource.data.clienteId.size() > 0 &&
+                      request.resource.data.tipo in ['venta', 'pago'] &&
+                      request.resource.data.fecha is timestamp &&
+                      request.resource.data.creado is timestamp &&
+                      request.resource.data.borrado is bool;
+      
+      let typeSpecificValid = true;
+      if (request.resource.data.tipo == 'venta') {
+        typeSpecificValid = request.resource.data.keys().hasAll(['producto', 'cantidad', 'costoUnitario', 'gananciaUnitaria', 'totalVenta']) &&
+                           request.resource.data.producto is string &&
+                           request.resource.data.producto.size() > 0 &&
+                           request.resource.data.cantidad is number &&
+                           request.resource.data.cantidad > 0 &&
+                           request.resource.data.costoUnitario is number &&
+                           request.resource.data.costoUnitario >= 0 &&
+                           request.resource.data.gananciaUnitaria is number &&
+                           request.resource.data.gananciaUnitaria >= 0 &&
+                           request.resource.data.totalVenta is number &&
+                           request.resource.data.totalVenta > 0;
+      } else if (request.resource.data.tipo == 'pago') {
+        typeSpecificValid = request.resource.data.keys().hasAll(['montoPago']) &&
+                           request.resource.data.montoPago is number &&
+                           request.resource.data.montoPago > 0;
+      }
+      
+      return baseValid && typeSpecificValid;
+    }
+    
+    // ============================================================================
+    // USER DOCUMENTS
+    // ============================================================================
+    
+    match /usuarios/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // User company memberships
+      match /empresas/{empresaId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // ============================================================================
+    // COMPANY DOCUMENTS
+    // ============================================================================
+    
+    match /empresas/{empresaId} {
+      allow read: if canReadCompany(empresaId);
+      allow create: if isAuthenticated() && 
+                       isValidCompanyData() &&
+                       request.resource.data.propietario == request.auth.uid;
+      allow update: if isCompanyOwner(empresaId) && isValidCompanyData();
+      allow delete: if isCompanyOwner(empresaId);
+      
+      // Company members
+      match /miembros/{userId} {
+        allow read: if canReadCompany(empresaId);
+        allow create: if isCompanyOwner(empresaId) &&
+                         request.resource.data.keys().hasAll(['userId', 'email', 'role', 'fechaIngreso']) &&
+                         request.resource.data.userId == userId &&
+                         request.resource.data.email is string &&
+                         request.resource.data.role in ['owner', 'member'] &&
+                         request.resource.data.fechaIngreso is timestamp;
+        allow update: if isCompanyOwner(empresaId) &&
+                         request.resource.data.keys().hasAll(['userId', 'email', 'role', 'fechaIngreso']) &&
+                         request.resource.data.userId == userId;
+        allow delete: if isCompanyOwner(empresaId) || 
+                         (isAuthenticated() && request.auth.uid == userId);
+      }
+      
+      // Products
+      match /productos/{productoId} {
+        allow read: if canReadCompany(empresaId);
+        allow create, update: if canWriteCompany(empresaId) && isValidProductData();
+        allow delete: if canWriteCompany(empresaId);
+      }
+      
+      // Clients
+      match /clientes/{clienteId} {
+        allow read: if canReadCompany(empresaId);
+        allow create, update: if canWriteCompany(empresaId) && isValidClientData();
+        allow delete: if canWriteCompany(empresaId);
+      }
+      
+      // Transaction Events
+      match /eventos/{eventoId} {
+        allow read: if canReadCompany(empresaId);
+        allow create, update: if canWriteCompany(empresaId) && isValidTransactionEventData();
+        allow delete: if canWriteCompany(empresaId);
+      }
+    }
+    
+    // ============================================================================
+    // COMPANY JOIN REQUESTS
+    // ============================================================================
+    
+    match /solicitudes/{solicitudId} {
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == resource.data.solicitanteId ||
+                      isCompanyOwner(resource.data.empresaId));
+      allow create: if isAuthenticated() &&
+                       request.resource.data.keys().hasAll(['empresaId', 'solicitanteId', 'solicitanteEmail', 'estado', 'creado']) &&
+                       request.resource.data.solicitanteId == request.auth.uid &&
+                       request.resource.data.solicitanteEmail == request.auth.token.email &&
+                       request.resource.data.estado == 'pendiente' &&
+                       request.resource.data.creado is timestamp;
+      allow update: if isAuthenticated() &&
+                       isCompanyOwner(resource.data.empresaId) &&
+                       request.resource.data.estado in ['aceptada', 'rechazada'] &&
+                       resource.data.estado == 'pendiente';
+      allow delete: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.solicitanteId ||
+                        isCompanyOwner(resource.data.empresaId));
+    }
+  }
+}

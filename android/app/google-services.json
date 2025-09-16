@@ -1,0 +1,43 @@
+{
+  "project_info": {
+    "project_number": "752493866551",
+    "project_id": "cuenta-microempresas",
+    "storage_bucket": "cuenta-microempresas.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:752493866551:android:placeholder",
+        "android_client_info": {
+          "package_name": "com.ukn.cuentamicroempresas"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "752493866551-placeholder.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ukn.cuentamicroempresas",
+            "certificate_hash": "placeholder_hash"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "placeholder_api_key"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "752493866551-placeholder.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

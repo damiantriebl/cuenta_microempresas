@@ -1,0 +1,365 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  Alert,
+  SafeAreaView,
+} from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Timestamp } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthProvider';
+import { 
+  TransactionEvent, 
+  Client,
+  Product,
+  CreateSaleEventData,
+  CreatePaymentEventData,
+  CreateProductData,
+  UpdateTransactionEventData
+} from '@/schemas/types';
+import { TransactionEventService } from '@/services/TransactionEventService';
+import { ClientService } from '@/services/ClientService';
+import ProductService from '@/services/ProductService';
+import TransactionHistoryList from '@/components/TransactionHistoryList';
+import TransactionModal from '@/components/TransactionModal';
+import TransactionEditModal from '@/components/TransactionEditModal';
+import NotesModal from '@/components/NotesModal';
+import { formatCurrency } from '@/schemas/business-logic';
+
+export default function ClientDetailScreen() {
+  const { id: clienteId } = useLocalSearchParams<{ id: string }>();
+  const { empresaId } = useAuth();
+  
+  // State
+  const [client, setClient] = useState<Client | null>(null);
+  const [events, setEvents] = useState<TransactionEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<TransactionEvent | null>(null);
+  const [notesEvent, setNotesEvent] = useState<TransactionEvent | null>(null);
+
+  // Services
+  const clientService = ClientService.getInstance();
+  const productService = ProductService.getInstance();
+
+  useEffect(() => {
+    if (empresaId && clienteId) {
+      loadClientData();
+      loadEvents();
+    }
+  }, [empresaId, clienteId]);
+
+  const loadClientData = async () => {
+    if (!empresaId || !clienteId) return;
+    
+    try {
+      const clientData = await clientService.getClientById(empresaId, clienteId);
+      setClient(clientData);
+    } catch (error) {
+      console.error('Error loading client:', error);
+      Alert.alert('Error', 'No se pudo cargar la información del cliente');
+    }
+  };
+
+  const loadEvents = async () => {
+    if (!empresaId || !clienteId) return;
+    
+    setIsLoading(true);
+    try {
+      const eventList = await TransactionEventService.getClientEvents(empresaId, clienteId);
+      setEvents(eventList);
+    } catch (error) {
+      console.error('Error loading events:', error);
+      Alert.alert('Error', 'No se pudieron cargar las transacciones');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateSale = async (saleData: CreateSaleEventData) => {
+    if (!empresaId) return;
+    
+    setIsLoading(true);
+    try {
+      const result = await TransactionEventService.createSaleEvent(empresaId, saleData);
+      
+      if (result.success) {
+        await loadEvents();
+        Alert.alert('Éxito', 'Venta registrada correctamente');
+      } else {
+        Alert.alert('Error', result.errors?.join('\n') || 'Error al crear la venta');
+      }
+    } catch (error) {
+      console.error('Error creating sale:', error);
+      Alert.alert('Error', 'No se pudo registrar la venta');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreatePayment = async (paymentData: CreatePaymentEventData) => {
+    if (!empresaId) return;
+    
+    setIsLoading(true);
+    try {
+      const result = await TransactionEventService.createPaymentEvent(empresaId, paymentData);
+      
+      if (result.success) {
+        await loadEvents();
+        Alert.alert('Éxito', 'Pago registrado correctamente');
+      } else {
+        Alert.alert('Error', result.errors?.join('\n') || 'Error al crear el pago');
+      }
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      Alert.alert('Error', 'No se pudo registrar el pago');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateProduct = async (productData: CreateProductData): Promise<Product | null> => {
+    if (!empresaId) return null;
+    
+    try {
+      const result = await productService.createProduct(empresaId, {
+        ...productData,
+        posicion: 0 // Will be handled by the service
+      });
+      
+      if (result.success && result.productId) {
+        // For now, return a basic product object since getProductById doesn't exist
+        const newProduct: Product = {
+          id: result.productId,
+          nombre: productData.nombre,
+          colorFondo: productData.colorFondo,
+          posicion: productData.posicion,
+          activo: productData.activo,
+          creado: Timestamp.now()
+        };
+        return newProduct;
+      } else {
+        Alert.alert('Error', result.errors?.join('\n') || 'Error al crear el producto');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error creating product:', error);
+      Alert.alert('Error', 'No se pudo crear el producto');
+      return null;
+    }
+  };
+
+  const handleEditEvent = (event: TransactionEvent) => {
+    // Check if event can be edited
+    const canEdit = TransactionEventService.canEditEvent(event);
+    if (!canEdit.canEdit) {
+      Alert.alert('No se puede editar', canEdit.reason || 'Este evento no se puede editar');
+      return;
+    }
+    
+    setEditingEvent(event);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEvent = async (eventId: string, updateData: UpdateTransactionEventData) => {
+    if (!empresaId) return;
+    
+    setIsLoading(true);
+    try {
+      const result = await TransactionEventService.updateEvent(empresaId, eventId, updateData);
+      
+      if (result.success) {
+        await loadEvents();
+        Alert.alert('Éxito', 'Transacción actualizada correctamente');
+      } else {
+        Alert.alert('Error', result.errors?.join('\n') || 'Error al actualizar la transacción');
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+      Alert.alert('Error', 'No se pudo actualizar la transacción');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!empresaId) return;
+    
+    // Find the event to check if it can be deleted
+    const event = events.find(e => e.id === eventId);
+    if (!event) return;
+    
+    const canDelete = TransactionEventService.canDeleteEvent(event);
+    if (!canDelete.canDelete) {
+      Alert.alert('No se puede eliminar', canDelete.reason || 'Este evento no se puede eliminar');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const result = await TransactionEventService.deleteEvent(empresaId, eventId);
+      
+      if (result.success) {
+        await loadEvents();
+        Alert.alert('Éxito', 'Transacción eliminada correctamente');
+      } else {
+        Alert.alert('Error', result.errors?.join('\n') || 'Error al eliminar la transacción');
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      Alert.alert('Error', 'No se pudo eliminar la transacción');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleViewNotes = (event: TransactionEvent) => {
+    setNotesEvent(event);
+    setShowNotesModal(true);
+  };
+
+  if (!client) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Cargando cliente...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.clientInfo}>
+          <Text style={styles.clientName}>{client.nombre}</Text>
+          <Text style={styles.clientDebt}>
+            Deuda: {formatCurrency(client.deudaActual)}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowTransactionModal(true)}
+          disabled={isLoading}
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+          <Text style={styles.addButtonText}>Nueva</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Transaction History */}
+      <View style={styles.content}>
+        <TransactionHistoryList
+          events={events}
+          onEditEvent={handleEditEvent}
+          onViewNotes={handleViewNotes}
+        />
+      </View>
+
+      {/* Transaction Creation Modal */}
+      <TransactionModal
+        visible={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        clienteId={clienteId}
+        clienteName={client.nombre}
+        onCreateSale={handleCreateSale}
+        onCreatePayment={handleCreatePayment}
+        onCreateProduct={handleCreateProduct}
+        isLoading={isLoading}
+      />
+
+      {/* Transaction Edit Modal */}
+      <TransactionEditModal
+        visible={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingEvent(null);
+        }}
+        event={editingEvent}
+        clienteName={client.nombre}
+        onUpdateTransaction={handleUpdateEvent}
+        onDeleteTransaction={handleDeleteEvent}
+        onCreateProduct={handleCreateProduct}
+        isLoading={isLoading}
+      />
+
+      {/* Notes Modal */}
+      <NotesModal
+        visible={showNotesModal}
+        onClose={() => {
+          setShowNotesModal(false);
+          setNotesEvent(null);
+        }}
+        event={notesEvent}
+        clienteName={client.nombre}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ebebeb',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  clientInfo: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  clientDebt: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 4,
+  },
+  addButton: {
+    backgroundColor: '#25B4BD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  content: {
+    flex: 1,
+  },
+});

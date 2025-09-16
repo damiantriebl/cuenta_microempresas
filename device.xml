@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d:devices xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:d="http://schemas.android.com/sdk/devices/1">
+
+  <d:device>
+    <d:name>Samsung Galaxy S23 (Play)</d:name>
+    <d:manufacturer>Samsung</d:manufacturer>
+
+    <d:hardware>
+      <d:screen>
+        <d:screen-size>normal</d:screen-size>
+        <d:diagonal-length>6.1</d:diagonal-length> <!-- pulgadas -->
+        <d:pixel-density>xxhdpi</d:pixel-density>
+        <d:screen-ratio>long</d:screen-ratio>
+        <d:dimensions>
+          <d:x-dimension>1080</d:x-dimension>
+          <d:y-dimension>2340</d:y-dimension>
+        </d:dimensions>
+        <d:xdpi>425</d:xdpi>
+        <d:ydpi>425</d:ydpi>
+        <d:touch>
+          <d:multitouch>jazz-hands</d:multitouch>
+          <d:mechanism>finger</d:mechanism>
+          <d:screen-type>capacitive</d:screen-type>
+        </d:touch>
+      </d:screen>
+
+      <d:networking>
+        Wifi
+        Bluetooth
+        NFC
+        Cellular
+      </d:networking>
+
+      <d:sensors>
+        Accelerometer
+        Gyroscope
+        Compass
+        GPS
+        LightSensor
+        ProximitySensor
+        Barometer
+      </d:sensors>
+
+      <d:mic>true</d:mic>
+
+      <d:camera>
+        <d:location>back</d:location>
+        <d:autofocus>true</d:autofocus>
+        <d:flash>true</d:flash>
+      </d:camera>
+      <d:camera>
+        <d:location>front</d:location>
+        <d:autofocus>false</d:autofocus>
+        <d:flash>false</d:flash>
+      </d:camera>
+
+      <d:keyboard>nokeys</d:keyboard>
+      <d:nav>nonav</d:nav>
+      <d:buttons>soft</d:buttons>
+
+      <d:ram unit="GiB">8</d:ram>
+      <d:internal-storage unit="GiB">128</d:internal-storage>
+      <d:removable-storage unit="MiB"></d:removable-storage>
+
+      <d:cpu>Snapdragon 8 Gen 2 (emulated)</d:cpu>
+      <d:gpu>Adreno (emulated)</d:gpu>
+
+      <!-- Listá ambas para flexibilidad al elegir imagen del sistema -->
+      <d:abi>
+        x86_64
+        arm64-v8a
+      </d:abi>
+
+      <d:dock></d:dock>
+      <d:power-type>battery</d:power-type>
+    </d:hardware>
+
+    <d:software>
+      <d:api-level>34-35</d:api-level> <!-- Android 14-15 -->
+      <d:live-wallpaper-support>true</d:live-wallpaper-support>
+      <d:gl-version>3.2</d:gl-version>
+      <d:status-bar>true</d:status-bar>
+    </d:software>
+
+    <d:state name="Portrait" default="true">
+      <d:description>Portrait</d:description>
+      <d:screen-orientation>port</d:screen-orientation>
+      <d:keyboard-state>keyssoft</d:keyboard-state>
+      <d:nav-state>nonav</d:nav-state>
+    </d:state>
+    <d:state name="Landscape">
+      <d:description>Landscape</d:description>
+      <d:screen-orientation>land</d:screen-orientation>
+      <d:keyboard-state>keyssoft</d:keyboard-state>
+      <d:nav-state>nonav</d:nav-state>
+    </d:state>
+  </d:device>
+
+</d:devices>

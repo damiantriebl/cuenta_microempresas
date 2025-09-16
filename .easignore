@@ -1,0 +1,57 @@
+# Development files
+node_modules/
+.git/
+.expo/
+.vscode/
+*.log
+*.tmp
+
+# Build artifacts
+android/build/
+ios/build/
+dist/
+build/
+
+# Development dependencies
+coverage/
+.nyc_output/
+*.test.*
+*.spec.*
+__tests__/
+test/
+tests/
+
+# Documentation
+docs/
+*.md
+README*
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large media files (if any)
+*.mov
+*.mp4
+*.avi
+
+# Lock files (keep package-lock.json but not yarn)
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files
+.env.local
+.env.development
+.env.test
+
+# Scripts that aren't needed for build
+scripts/migration*
+scripts/test*
+scripts/development*
+
