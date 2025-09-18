@@ -1,6 +1,21 @@
-# 📱 Campo - Aplicación de Gestión de Microempresas
+# 📱 Cuenta Microempresas - Aplicación de Gestión de Microempresas
 
 Esta es una aplicación [Expo](https://expo.dev) + React Native + Firebase diseñada para la gestión de microempresas, con soporte para Android y Web.
+
+
+# ACTUALMENTE SE PUEDE USAR COMO DEMO
+
+https://campo-9fb40.web.app/
+
+## Tambien se puede usar para android 
+
+https://play.google.com/apps/internaltest/4701338497453554763
+
+en teoria, si abren ese link desde un telefono android pueden acceder a la version de prueba interna, por cuestiones que tarda mucho sacarlo a produccion 
+y se requieren 12 verificadores de prueba cerrada, no creo que llegue a estar directametne en android, pero si me pasan las direcciones de mail de los que deseen 
+testear la aplicacion a damiantriebl@gmail.com, puedo agregarlos como tester y se instala automaticamente.
+
+se probo unicamente en android por el MVP, pero pasarlo a iOS para Iphone no es una tarea muy compleja ya que practicamente React native lo hace automaticamente.
 
 ## 🚀 Configuración Rápida
 
@@ -15,7 +30,7 @@ Esta es una aplicación [Expo](https://expo.dev) + React Native + Firebase dise�
 
 1. **Clonar el repositorio**
    ```bash
-   git clone <url-del-repositorio>
+   git clone https://github.com/damiantriebl/cuenta_microempresas
    cd micro-empresas
    ```
 
@@ -25,10 +40,9 @@ Esta es una aplicación [Expo](https://expo.dev) + React Native + Firebase dise�
    ```
 
 3. **Configurar variables de entorno**
-   ```bash
-   cp .env.example .env
-   ```
-   Edita el archivo `.env` con tus valores específicos (ver sección de Variables de Entorno).
+   Por el periodo unicamente de el tiempo del concurso, tengo las variables de entorno publicas, lo cual no es lo optimo, pero tengo un free tier de firebase, por ende lo maximo que podria pasar es que se bloquee, para cambiar de tier, 
+   solo hay q tener una cuenta de firebase, y poner las variables en firebaseConfig.ts -> https://firebase.google.cn/docs/web/setup?hl=es-419 (se explica mas adelante)
+
 
 4. **Iniciar la aplicación**
    ```bash
@@ -52,7 +66,7 @@ EAS_PROJECT_ID=tu-project-id-aqui
 # Configuración de Google Services
 GOOGLE_CLIENT_ID=tu-google-client-id-aqui
 
-# Propietario de Expo (para builds EAS)
+# Propietario de Expo (para builds EAS) -> no es necesario, pero si alguien tiene puede buildear de ahi
 EXPO_OWNER=tu-username-expo
 
 # Entorno de desarrollo
@@ -173,6 +187,7 @@ La aplicación utiliza Firebase para:
 2. Configura Authentication y Firestore
 3. Actualiza `firebaseConfig.ts` con tu configuración
 4. Para despliegue web: `firebase init hosting`
+5. POR CUESTIONES DE TIEMPO, van a estar abiertas las contraseñas de firebase, esto es un riesgo de seguridad, pero se hace por el tiempo del concurso
 
 ## 🧪 Testing
 
@@ -262,24 +277,6 @@ pnpm run cleanup:full
 pnpm run cleanup:help
 ```
 
-**Características del sistema de limpieza**:
-- ✅ Eliminación de código muerto y dependencias no utilizadas
-- ✅ Limpieza de assets no referenciados
-- ✅ Optimización de configuraciones (Expo, EAS, Firebase)
-- ✅ Validación automática post-limpieza
-- ✅ Sistema de respaldo y rollback
-
-**Documentación completa**:
-- [Guía de Limpieza](docs/GUIA_LIMPIEZA_PROYECTO.md) - Documentación completa del sistema
-- [Solución de Problemas](docs/SOLUCION_PROBLEMAS_LIMPIEZA.md) - Troubleshooting específico
-- [Ejemplos de Uso](docs/EJEMPLOS_USO_LIMPIEZA.md) - Casos prácticos y ejemplos
-
-## 📚 Documentación Adicional
-
-- [Configuración de la Aplicación](docs/APP_CONFIGURATION.md)
-- [Sistema de Logging](docs/BLACK_SCREEN_LOGGING_SYSTEM.md)
-- [Guía de Testing](docs/ENVIRONMENT_TESTING_GUIDE.md)
-- [Troubleshooting](docs/QUICK_TROUBLESHOOTING_REFERENCE.md)
 
 ## 🤝 Contribución
 
@@ -291,12 +288,12 @@ pnpm run cleanup:help
 
 ## 📄 Licencia
 
-Este proyecto es privado y está destinado únicamente para uso interno.
-
+Este proyecto es publico, no tengo ningun ownership, lo hice especificamente para la gente de Banco Provincia bajo el contexto de el concurso de Innovacion Tecnologica
 ## 🆘 Soporte
 
 Para problemas técnicos o preguntas:
 
+### principalmente comunicarse conmigo, ** damiantriebl@gmail.com ** si no por telefono a 2262 556307
 1. Revisa la [documentación de troubleshooting](docs/QUICK_TROUBLESHOOTING_REFERENCE.md)
 2. Verifica los logs de la aplicación
 3. Ejecuta los scripts de diagnóstico disponibles
