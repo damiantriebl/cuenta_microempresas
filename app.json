@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Cuenta Microempresas - Gestión de Ventas",
+
     "slug": "cuenta-microempresas",
     "version": "1.0.1",
     "jsEngine": "hermes",
@@ -44,7 +45,7 @@
       "output": "static",
       "favicon": "./assets/images/logo.png",
       "name": "Cuenta Microempresas",
-      "shortName": "Campo",
+      "shortName": "cuentamicroempresas",
       "lang": "es",
       "scope": "/",
       "themeColor": "#25B4BD",
@@ -61,7 +62,6 @@
       }
     },
     "plugins": [
-      "expo-dev-client",
       "expo-router",
       [
         "expo-splash-screen",
@@ -76,6 +76,11 @@
     "experiments": {
       "typedRoutes": true
     },
+    "expo": {
+       "android": {
+         "package": "com.ukn.cuentamicroempresas", "versionCode": 3 
+       }
+     },
     "owner": "demt"
   }
 }
